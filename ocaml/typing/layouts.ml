@@ -259,6 +259,9 @@ module Layout = struct
     | Type_parameter of Path.t * string
     | With_constraint of string
     | Newtype_declaration of string
+    | Constructor_type_parameter of Path.t * string
+    | Univar of string
+    | Type_variable of string
 
   type creation_reason =
     | Annotated of annotation_context * Location.t
@@ -376,18 +379,21 @@ module Layout = struct
     | Value -> fresh_layout (Sort Sort.value) ~why
     | Void -> fresh_layout (Sort Sort.void) ~why
 
+  let of_annotation ~reason Location.{ loc; txt = const } =
+    of_const ~why:(Annotated (reason, loc)) const
+
+  let of_annotation_option ~reason = Option.map (of_annotation ~reason)
+
+  let of_annotation_option_default ~default ~reason =
+    Option.fold ~none:default ~some:(of_annotation ~reason)
+
   let of_attributes ~legacy_immediate ~reason attrs =
-    match Builtin_attributes.layout ~legacy_immediate attrs with
-    | Ok None as a -> a
-    | Ok (Some l) -> Ok (Some (of_const ~why:(Annotated (reason, l.loc))
-                                 l.txt))
-    | Error _ as e -> e
+    Builtin_attributes.layout ~legacy_immediate attrs |>
+    Result.map (of_annotation_option ~reason)
 
   let of_attributes_default ~legacy_immediate ~reason ~default attrs =
-    match of_attributes ~legacy_immediate ~reason attrs with
-    | Ok None -> Ok default
-    | Ok (Some l) -> Ok l
-    | Error _ as e -> e
+    Builtin_attributes.layout ~legacy_immediate attrs |>
+    Result.map (of_annotation_option_default ~default ~reason)
 
   let for_boxed_record ~all_void =
     if all_void then immediate ~why:Empty_record else value ~why:Boxed_record
@@ -568,6 +574,15 @@ module Layout = struct
       | Newtype_declaration name ->
           fprintf ppf "the abstract type declaration for %s"
             name
+      | Constructor_type_parameter (cstr, name) ->
+          fprintf ppf "@[%s@ in the declaration of constructor@ %a@]"
+            name
+            !printtyp_path cstr
+      | Univar name ->
+          fprintf ppf "the universal variable %s"
+            name
+      | Type_variable name ->
+          fprintf ppf "the type variable %s" name
 
     let format_any_creation_reason ppf : any_creation_reason -> unit = function
       | Missing_cmi p ->
@@ -994,6 +1009,12 @@ module Layout = struct
           fprintf ppf "With_constraint %S" s
       | Newtype_declaration name ->
           fprintf ppf "Newtype_declaration %s" name
+      | Constructor_type_parameter (cstr, name) ->
+          fprintf ppf "Constructor_type_parameter (%a, %S)" Path.print cstr name
+      | Univar name ->
+          fprintf ppf "Univar %S" name
+      | Type_variable name ->
+          fprintf ppf "Type_variable %S" name
 
     let any_creation_reason ppf : any_creation_reason -> unit = function
       | Missing_cmi p -> fprintf ppf "Missing_cmi %a" Path.print p

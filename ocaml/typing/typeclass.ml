@@ -320,7 +320,7 @@ let rec class_type_field env sign self_scope ctf =
         (fun () ->
            let sty = Ast_helper.Typ.force_poly sty in
            match sty.ptyp_desc, priv with
-           | Ptyp_poly ([],sty'), Public ->
+           | Ptyp_poly ([],sty',[]), Public ->
                let expected_ty =
                  Ctype.newvar (Layout.value ~why:Object_field)
                in
@@ -1604,6 +1604,8 @@ let class_infos define_class kind
   let ci_params =
     let make_param (sty, v) =
       try
+          (* CR layouts: That should probably allow [any], not just
+             [value] *)
           (transl_type_param env sty (Layout.value ~why:Class_argument), v)
       with Already_bound ->
         raise(Error(sty.ptyp_loc, env, Repeated_parameter))

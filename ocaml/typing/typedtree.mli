@@ -171,8 +171,8 @@ and exp_extra =
          *)
   | Texp_poly of core_type option
         (** Used for method bodies. *)
-  | Texp_newtype of string
-        (** fun (type t) ->  *)
+  | Texp_newtype of string * const_layout option
+        (** fun (type t : immediate) ->  *)
 
 and fun_curry_state =
   | More_args of { partial_mode : Types.alloc_mode }
@@ -728,8 +728,15 @@ and core_type_desc =
   | Ttyp_class of Path.t * Longident.t loc * core_type list
   | Ttyp_alias of core_type * string
   | Ttyp_variant of row_field list * closed_flag * label list option
-  | Ttyp_poly of string list * core_type
+  | Ttyp_poly of (string * Asttypes.const_layout option) list * core_type
   | Ttyp_package of package_type
+  | Ttyp_layout of core_type * Asttypes.const_layout
+      (* The expression level equivalent of Ttyp_layout is Pexp_constraint,
+         which appears only as an exp_extra. In types, though, we store
+         it right in the core_type_desc. This is because, post-type-checking,
+         we don't analyze types in the same way we do expressions, for which
+         keeping inessential information (like the user-written type constraint)
+         off to the side is beneficial. *)
 
 and package_type = {
   pack_path : Path.t;
@@ -804,7 +811,7 @@ and constructor_declaration =
     {
      cd_id: Ident.t;
      cd_name: string loc;
-     cd_vars: string loc list;
+     cd_vars: (string * const_layout option) list;
      cd_args: constructor_arguments;
      cd_res: core_type option;
      cd_loc: Location.t;
@@ -844,7 +851,9 @@ and extension_constructor =
   }
 
 and extension_constructor_kind =
-    Text_decl of string loc list * constructor_arguments * core_type option
+    Text_decl of (string * const_layout option) list *
+                 constructor_arguments *
+                 core_type option
   | Text_rebind of Path.t * Longident.t loc
 
 and class_type =

@@ -29,7 +29,11 @@ module TyVarEnv : sig
   (** Evaluate in a narrowed type-variable scope *)
 
   type poly_univars
-  val make_poly_univars : string list -> poly_univars
+  val make_poly_univars :
+    reason:(string -> Layout.annotation_context) ->
+    string Location.loc list ->
+    Asttypes.layout_annotation option list ->
+    poly_univars
     (** remember that a list of strings connotes univars; this must
         always be paired with a [check_poly_univars]. *)
 
@@ -74,6 +78,8 @@ type value_loc =
 type sort_loc =
     Fun_arg | Fun_ret
 
+type cannot_quantify_reason
+type layout_info
 type error =
   | Unbound_type_variable of string * string list
   | No_type_wildcards
@@ -90,7 +96,9 @@ type error =
   | Not_a_variant of type_expr
   | Variant_tags of string * string
   | Invalid_variable_name of string
-  | Cannot_quantify of string * type_expr
+  | Cannot_quantify of string * cannot_quantify_reason
+  | Bad_univar_layout of
+      { name : string; layout_info : layout_info; inferred_layout : layout }
   | Multiple_constraints_on_type of Longident.t
   | Method_mismatch of string * type_expr * type_expr
   | Opened_object of Path.t option
@@ -101,6 +109,7 @@ type error =
       {vloc : value_loc; typ : type_expr; err : Layout.Violation.t}
   | Non_sort of
       {vloc : sort_loc; typ : type_expr; err : Layout.Violation.t}
+  | Bad_layout_annot of type_expr * Layout.Violation.t
 
 exception Error of Location.t * Env.t * error
 

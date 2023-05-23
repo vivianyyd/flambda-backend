@@ -96,7 +96,7 @@ and exp_extra =
   | Texp_constraint of core_type
   | Texp_coerce of core_type option * core_type
   | Texp_poly of core_type option
-  | Texp_newtype of string
+  | Texp_newtype of string * const_layout option
 
 
 and fun_curry_state =
@@ -531,8 +531,9 @@ and core_type_desc =
   | Ttyp_class of Path.t * Longident.t loc * core_type list
   | Ttyp_alias of core_type * string
   | Ttyp_variant of row_field list * closed_flag * label list option
-  | Ttyp_poly of string list * core_type
+  | Ttyp_poly of (string * const_layout option) list * core_type
   | Ttyp_package of package_type
+  | Ttyp_layout of core_type * const_layout
 
 and package_type = {
   pack_path : Path.t;
@@ -582,6 +583,7 @@ and type_declaration =
     typ_manifest: core_type option;
     typ_loc: Location.t;
     typ_attributes: attribute list;
+    (* XXX layouts RAE: should that be a const_layout? *)
     typ_layout_annotation: layout option;
    }
 
@@ -606,7 +608,7 @@ and constructor_declaration =
     {
      cd_id: Ident.t;
      cd_name: string loc;
-     cd_vars: string loc list;
+     cd_vars: (string * const_layout option) list;
      cd_args: constructor_arguments;
      cd_res: core_type option;
      cd_loc: Location.t;
@@ -646,7 +648,9 @@ and extension_constructor =
   }
 
 and extension_constructor_kind =
-    Text_decl of string loc list * constructor_arguments * core_type option
+    Text_decl of (string * const_layout option) list *
+                 constructor_arguments *
+                 core_type option
   | Text_rebind of Path.t * Longident.t loc
 
 and class_type =

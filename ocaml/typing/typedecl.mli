@@ -102,8 +102,8 @@ type error =
   | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
-  | Layout_coherence_check of type_expr * Layout.Violation.t
-  | Layout_update_check of Path.t * Layout.Violation.t
+  | Layout_of_type of type_expr * Layout.Violation.t
+  | Layout_of_path of Path.t * Layout.Violation.t
   | Layout_sort of
       { lloc : layout_sort_loc
       ; typ : type_expr

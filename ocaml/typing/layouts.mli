@@ -102,6 +102,9 @@ module Layout : sig
     | Type_parameter of Path.t * string
     | With_constraint of string
     | Newtype_declaration of string
+    | Constructor_type_parameter of Path.t * string
+    | Univar of string
+    | Type_variable of string
 
    type value_creation_reason =
     | Class_let_binding
@@ -261,6 +264,13 @@ module Layout : sig
 
   val of_sort : why:concrete_layout_reason -> sort -> t
   val of_const : why:creation_reason -> const -> t
+
+  val of_annotation :
+    reason:annotation_context -> Asttypes.layout_annotation -> t
+
+  val of_annotation_option_default :
+    default:t -> reason:annotation_context ->
+    Asttypes.layout_annotation option -> t
 
   (** Find a layout in attributes.  Returns error if a disallowed layout is
       present, but always allows immediate attributes if ~legacy_immediate is

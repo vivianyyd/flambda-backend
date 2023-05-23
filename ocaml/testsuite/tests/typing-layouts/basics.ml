@@ -1,29 +1,29 @@
 (* TEST
    * expect
 *)
-type t_value [@@value]
-type t_imm   [@@immediate]
-type t_imm64 [@@immediate64];;
+type t_value : value
+type t_imm   : immediate
+type t_imm64 : immediate64;;
 
 [%%expect{|
-type t_value [@@value]
-type t_imm [@@immediate]
-type t_imm64 [@@immediate64]
+type t_value : value
+type t_imm : immediate
+type t_imm64 : immediate64
 |}]
 
-type t_any   [@@any];;
+type t_any   : any;;
 [%%expect{|
-Line 1, characters 13-20:
-1 | type t_any   [@@any];;
-                 ^^^^^^^
+Line 1, characters 15-18:
+1 | type t_any   : any;;
+                   ^^^
 Error: Layout any is used here, but the appropriate layouts extension is not enabled
 |}];;
 
-type t_void  [@@void];;
+type t_void  : void;;
 [%%expect{|
-Line 1, characters 13-21:
-1 | type t_void  [@@void];;
-                 ^^^^^^^^
+Line 1, characters 15-19:
+1 | type t_void  : void;;
+                   ^^^^
 Error: Layout void is used here, but the appropriate layouts extension is not enabled
 |}];;
 
@@ -53,11 +53,11 @@ module type S = sig val f1 : t_value -> t_value val f2 : t_imm -> t_imm64 end
 
 (* CR layouts: mostly moved to [basics_beta.ml].  Bring back here when we allow
    annotations on parameters by default. *)
-type 'a [@immediate] imm_id = 'a;;
+type ('a : immediate) imm_id = 'a;;
 [%%expect{|
-Line 1, characters 8-20:
-1 | type 'a [@immediate] imm_id = 'a;;
-            ^^^^^^^^^^^^
+Line 1, characters 11-20:
+1 | type ('a : immediate) imm_id = 'a;;
+               ^^^^^^^^^
 Error: Layout immediate is used here, but the appropriate layouts extension is not enabled
 |}];;
 
@@ -178,11 +178,11 @@ and foo14 = string
 (* CR layouts: This test moved to [basics_alpha.ml] as it needs a non-value
    sort.  Bring back here when we have one enabled by default. *)
 
-type 'a t_void_16 [@@void];;
+type 'a t_void_16 : void;;
 [%%expect{|
-Line 1, characters 18-26:
-1 | type 'a t_void_16 [@@void];;
-                      ^^^^^^^^
+Line 1, characters 20-24:
+1 | type 'a t_void_16 : void;;
+                        ^^^^
 Error: Layout void is used here, but the appropriate layouts extension is not enabled
 |}];;
 
@@ -239,11 +239,11 @@ val f18 : 'a -> 'a = <fun>
 (* CR layouts: This test moved to [basics_alpha.ml] as it needs a non-value
    sort.  Bring back here when we have one enabled by default. *)
 
-type t_void [@@void];;
+type t_void : void;;
 [%%expect{|
-Line 1, characters 12-20:
-1 | type t_void [@@void];;
-                ^^^^^^^^
+Line 1, characters 14-18:
+1 | type t_void : void;;
+                  ^^^^
 Error: Layout void is used here, but the appropriate layouts extension is not enabled
 |}];;
 

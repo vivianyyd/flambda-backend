@@ -80,10 +80,13 @@ module Typ :
     val alias: ?loc:loc -> ?attrs:attrs -> core_type -> string -> core_type
     val variant: ?loc:loc -> ?attrs:attrs -> row_field list -> closed_flag
                  -> label list option -> core_type
-    val poly: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
+    val poly: ?loc:loc -> ?attrs:attrs -> str list -> core_type
+                 -> layout_annotation option list -> core_type
     val package: ?loc:loc -> ?attrs:attrs -> lid -> (lid * core_type) list
                  -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
+    val layout: ?loc:loc -> ?attrs:attrs -> core_type
+                 -> layout_annotation -> core_type
 
     val force_poly: core_type -> core_type
 
@@ -181,7 +184,8 @@ module Exp:
     val poly: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
               -> expression
     val object_: ?loc:loc -> ?attrs:attrs -> class_structure -> expression
-    val newtype: ?loc:loc -> ?attrs:attrs -> str -> expression -> expression
+    val newtype: ?loc:loc -> ?attrs:attrs -> str -> expression
+      -> layout_annotation option -> expression
     val pack: ?loc:loc -> ?attrs:attrs -> module_expr -> expression
     val open_: ?loc:loc -> ?attrs:attrs -> open_declaration -> expression
                -> expression
@@ -206,12 +210,14 @@ module Type:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
       ?params:(core_type * (variance * injectivity)) list ->
+      ?layout:attribute ->
       ?cstrs:(core_type * core_type * loc) list ->
       ?kind:type_kind -> ?priv:private_flag -> ?manifest:core_type -> str ->
       type_declaration
 
     val constructor: ?loc:loc -> ?attrs:attrs -> ?info:info ->
-      ?vars:str list -> ?args:constructor_arguments -> ?res:core_type ->
+      ?vars:(str list * layout_annotation option list) ->
+      ?args:constructor_arguments -> ?res:core_type ->
       str ->
       constructor_declaration
     val field: ?loc:loc -> ?attrs:attrs -> ?info:info ->
@@ -232,7 +238,8 @@ module Te:
       str -> extension_constructor_kind -> extension_constructor
 
     val decl: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->
-      ?vars:str list -> ?args:constructor_arguments -> ?res:core_type ->
+      ?vars:(str list * layout_annotation option list) ->
+      ?args:constructor_arguments -> ?res:core_type ->
       str ->
       extension_constructor
     val rebind: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->

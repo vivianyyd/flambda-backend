@@ -7,26 +7,26 @@
 
 (* CR layouts v2: add mixed block restriction tests. *)
 
-type t_value [@@value]
-type t_immediate [@@immediate];;
+type t_value : value
+type t_immediate : immediate;;
 [%%expect {|
-type t_value [@@value]
-type t_immediate [@@immediate]
+type t_value : value
+type t_immediate : immediate
 |}];;
 
-type t_any [@@any];;
+type t_any : any;;
 [%%expect{|
-Line 1, characters 11-18:
-1 | type t_any [@@any];;
-               ^^^^^^^
+Line 1, characters 13-16:
+1 | type t_any : any;;
+                 ^^^
 Error: Layout any is used here, but the appropriate layouts extension is not enabled
 |}];;
 
-type t_void [@@void];;
+type t_void : void;;
 [%%expect{|
-Line 1, characters 12-20:
-1 | type t_void [@@void];;
-                ^^^^^^^^
+Line 1, characters 14-18:
+1 | type t_void : void;;
+                  ^^^^
 Error: Layout void is used here, but the appropriate layouts extension is not enabled
 |}];;
 

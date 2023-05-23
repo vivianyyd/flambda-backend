@@ -52,6 +52,7 @@ type mapper = {
   include_declaration: mapper -> include_declaration -> include_declaration;
   include_description: mapper -> include_description -> include_description;
   label_declaration: mapper -> label_declaration -> label_declaration;
+  layout_annotation: mapper -> Asttypes.const_layout -> Asttypes.const_layout;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> module_binding -> module_binding;
   module_declaration: mapper -> module_declaration -> module_declaration;
@@ -100,6 +101,8 @@ let map_tuple3 f1 f2 f3 (x, y, z) = (f1 x, f2 y, f3 z)
 let map_opt f = function None -> None | Some x -> Some (f x)
 
 let map_loc sub {loc; txt} = {loc = sub.location sub loc; txt}
+let map_loc_txt sub f {loc; txt} =
+  {loc = sub.location sub loc; txt = f sub txt}
 
 module C = struct
   (* Constants *)
@@ -143,6 +146,9 @@ module T = struct
     in
     Of.mk ~loc ~attrs desc
 
+  let type_vars_layouts sub (tvls : type_vars_layouts) =
+    List.map (map_opt (map_loc_txt sub sub.layout_annotation)) tvls
+
   let map_jst _sub : Jane_syntax.Core_type.t -> Jane_syntax.Core_type.t =
     function
     | _ -> .
@@ -176,12 +182,17 @@ module T = struct
     | Ptyp_alias (t, s) -> alias ~loc ~attrs (sub.typ sub t) s
     | Ptyp_variant (rl, b, ll) ->
         variant ~loc ~attrs (List.map (row_field sub) rl) b ll
-    | Ptyp_poly (sl, t) -> poly ~loc ~attrs
-                             (List.map (map_loc sub) sl) (sub.typ sub t)
+    | Ptyp_poly (sl, t, lays) ->
+        poly ~loc ~attrs (List.map (map_loc sub) sl)
+                         (sub.typ sub t)
+                         (type_vars_layouts sub lays)
     | Ptyp_package (lid, l) ->
         package ~loc ~attrs (map_loc sub lid)
           (List.map (map_tuple (map_loc sub) (sub.typ sub)) l)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
+    | Ptyp_layout (t, lay) -> layout ~loc ~attrs
+                                (sub.typ sub t)
+                                (map_loc_txt sub sub.layout_annotation lay)
 
   let map_type_declaration sub
       {ptype_name; ptype_params; ptype_cstrs;
@@ -239,10 +250,11 @@ module T = struct
     | _ -> .
 
   let map_extension_constructor_kind sub = function
-      Pext_decl(vars, ctl, cto) ->
+      Pext_decl(vars, ctl, cto, layouts) ->
         Pext_decl(List.map (map_loc sub) vars,
                   map_constructor_arguments sub ctl,
-                  map_opt (sub.typ sub) cto)
+                  map_opt (sub.typ sub) cto,
+                  type_vars_layouts sub layouts)
     | Pext_rebind li ->
         Pext_rebind (map_loc sub li)
 
@@ -605,8 +617,9 @@ module E = struct
     | Pexp_poly (e, t) ->
         poly ~loc ~attrs (sub.expr sub e) (map_opt (sub.typ sub) t)
     | Pexp_object cls -> object_ ~loc ~attrs (sub.class_structure sub cls)
-    | Pexp_newtype (s, e) ->
+    | Pexp_newtype (s, e, l) ->
         newtype ~loc ~attrs (map_loc sub s) (sub.expr sub e)
+          (map_opt (map_loc_txt sub sub.layout_annotation) l)
     | Pexp_pack me -> pack ~loc ~attrs (sub.module_expr sub me)
     | Pexp_open (o, e) ->
         open_ ~loc ~attrs (sub.open_declaration sub o) (sub.expr sub e)
@@ -878,11 +891,12 @@ let default_mapper =
 
 
     constructor_declaration =
-      (fun this {pcd_name; pcd_vars; pcd_args;
+      (fun this {pcd_name; pcd_vars; pcd_layouts; pcd_args;
                  pcd_res; pcd_loc; pcd_attributes} ->
         Type.constructor
           (map_loc this pcd_name)
-          ~vars:(List.map (map_loc this) pcd_vars)
+          ~vars:(List.map (map_loc this) pcd_vars,
+                 List.map (Option.map (map_loc this)) pcd_layouts)
           ~args:(T.map_constructor_arguments this pcd_args)
           ?res:(map_opt (this.typ this) pcd_res)
           ~loc:(this.location this pcd_loc)
@@ -930,6 +944,8 @@ let default_mapper =
          | PPat (x, g) -> PPat (this.pat this x, map_opt (this.expr this) g)
       );
 
+    layout_annotation = (fun _this l -> l);
+
     expr_jane_syntax = E.map_jst;
     extension_constructor_jane_syntax = T.map_extension_constructor_jst;
     module_type_jane_syntax = MT.map_jane_syntax;
@@ -937,7 +953,6 @@ let default_mapper =
     signature_item_jane_syntax = MT.map_signature_item_jst;
     structure_item_jane_syntax = M.map_structure_item_jst;
     typ_jane_syntax = T.map_jst;
-
   }
 
 let extension_of_error {kind; main; sub} =
