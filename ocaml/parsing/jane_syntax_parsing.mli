@@ -159,30 +159,17 @@ module AST : sig
       which should be [ghost]. *)
   val wrap_desc
     :  ('ast, 'ast_desc) t
-    -> ?loc:Location.t
-    -> attrs:Parsetree.attributes
     -> 'ast_desc
+    -> loc:Location.t
+    -> attrs:Parsetree.attributes
     -> 'ast
 
   (** Embed a term from one of our novel syntactic features in the AST using the
       given name (the [Embedded_name.t]) and body (the [ast]).  Any locations in
-      the generated AST will be set to [!Ast_helper.default_loc], which should
-      be [ghost]. *)
+      the generated AST will be set to [loc], which must be [ghost]. *)
   val make_jane_syntax :
-    ('ast, 'ast_desc) t -> Embedded_name.t -> 'ast -> 'ast_desc
-
-  (** As [make_jane_syntax], but specifically for the AST node corresponding to
-      the entire piece of novel syntax (e.g., for a list comprehension, the
-      whole [[x for x in xs]], and not a subcomponent like [for x in xs]).  This
-      sets [Ast_helper.default_loc] locally to the [ghost] version of the
-      provided location, which is why the [ast] is generated from a function
-      call; it is during this call that the location is so set. *)
-  val make_entire_jane_syntax
-    :  ('ast, 'ast_desc) t
-    -> loc:Location.t
-    -> string
-    -> (unit -> 'ast)
-    -> 'ast_desc
+    ('ast, 'ast_desc) t -> Embedded_name.t -> 'ast -> loc:Location.t ->
+    'ast_desc
 
   (** Build an [of_ast] function. The return value of this function should be
       used to implement [of_ast] in modules satisfying the signature

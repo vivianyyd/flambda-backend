@@ -105,22 +105,30 @@ module Comprehensions = struct
           ; match direction with
             | Upto   -> "upto"
             | Downto -> "downto" ]
-          (Ast_helper.Exp.tuple [start; stop])
+          (embed_expression (Pexp_tuple [start; stop]))
     | In seq ->
         comprehension_expr ["for"; "in"] seq
 
   let expr_of_clause_binding { pattern; iterator; attributes } =
-    Ast_helper.Vb.mk ~attrs:attributes pattern (expr_of_iterator iterator)
+    { pvb_pat = pattern
+    ; pvb_attributes = attributes
+    ; pvb_loc = !Ast_helper.default_loc
+    ; pvb_expr = expr_of_iterator iterator
+    }
 
   let expr_of_clause clause rest = match clause with
     | For iterators ->
         comprehension_expr
           ["for"]
-          (Ast_helper.Exp.let_
-             Nonrecursive (List.map expr_of_clause_binding iterators)
-             rest)
+          (embed_expression
+            (Pexp_let
+               ( Nonrecursive
+               , List.map expr_of_clause_binding iterators
+               , rest )))
     | When cond ->
-        comprehension_expr ["when"] (Ast_helper.Exp.sequence cond rest)
+        comprehension_expr
+          ["when"]
+          (embed_expression (Pexp_sequence (cond, rest)))
 
   let expr_of_comprehension ~type_ { body; clauses } =
     (* We elect to wrap the body in a new AST node (here, [Pexp_lazy])
@@ -132,11 +140,12 @@ module Comprehensions = struct
     *)
     comprehension_expr
       type_
-      (Ast_helper.Exp.lazy_
-        (List.fold_right
-          expr_of_clause
-          clauses
-          (comprehension_expr ["body"] body)))
+      (embed_expression
+         (Pexp_lazy
+            (List.fold_right
+              expr_of_clause
+              clauses
+              (comprehension_expr ["body"] body))))
 
   let expr_of ~loc cexpr =
     (* See Note [Wrapping with make_entire_jane_syntax] *)
@@ -282,7 +291,7 @@ module Immutable_arrays = struct
     | Iaexp_immutable_array elts ->
       (* See Note [Wrapping with make_entire_jane_syntax] *)
       AST.make_entire_jane_syntax Expression ~loc extension_string (fun () ->
-        Ast_helper.Exp.array elts)
+        embed_expression (Pexp_array elts))
 
   (* Returns remaining unconsumed attributes *)
   let of_expr expr = match expr.pexp_desc with
@@ -293,7 +302,7 @@ module Immutable_arrays = struct
     | Iapat_immutable_array elts ->
       (* See Note [Wrapping with make_entire_jane_syntax] *)
       AST.make_entire_jane_syntax Pattern ~loc extension_string (fun () ->
-        Ast_helper.Pat.array elts)
+        embed_pattern (Ppat_array elts))
 
   (* Returns remaining unconsumed attributes *)
   let of_pat pat = match pat.ppat_desc with
@@ -315,7 +324,7 @@ module Include_functor = struct
     | Ifsig_include_functor incl ->
         (* See Note [Wrapping with make_entire_jane_syntax] *)
         AST.make_entire_jane_syntax Signature_item ~loc extension_string
-          (fun () -> Ast_helper.Sig.include_ incl)
+          (fun () -> embed_signature_item (Psig_include incl))
 
   let of_sig_item sigi = match sigi.psig_desc with
     | Psig_include incl -> Ifsig_include_functor incl
@@ -325,7 +334,7 @@ module Include_functor = struct
     | Ifstr_include_functor incl ->
         (* See Note [Wrapping with make_entire_jane_syntax] *)
         AST.make_entire_jane_syntax Structure_item ~loc extension_string
-          (fun () -> Ast_helper.Str.include_ incl)
+          (fun () -> embed_structure_item (Pstr_include incl))
 
   let of_str_item stri = match stri.pstr_desc with
     | Pstr_include incl -> Ifstr_include_functor incl
@@ -346,8 +355,10 @@ module Strengthen = struct
   let mty_of ~loc { mty; mod_id } =
     (* See Note [Wrapping with make_entire_jane_syntax] *)
     AST.make_entire_jane_syntax Module_type ~loc extension_string (fun () ->
-      Ast_helper.Mty.functor_ (Named (Location.mknoloc None, mty))
-        (Ast_helper.Mty.alias mod_id))
+      embed_module_type
+        (Pmty_functor
+           ( Named (Location.mknoloc None, mty)
+           , embed_module_type (Pmty_alias mod_id) )))
 
   (* Returns remaining unconsumed attributes *)
   let of_mty mty = match mty.pmty_desc with

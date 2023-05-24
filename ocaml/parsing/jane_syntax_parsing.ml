@@ -74,6 +74,43 @@ open Parsetree
 
 (******************************************************************************)
 
+let wrap_expression pexp_desc ~loc ~attrs =
+  { pexp_desc
+  ; pexp_loc = loc
+  ; pexp_attributes = attrs
+  ; pexp_loc_stack = []
+  }
+
+let wrap_pattern ppat_desc ~loc ~attrs =
+  { ppat_desc
+  ; ppat_loc = loc
+  ; ppat_attributes = attrs
+  ; ppat_loc_stack = []
+  }
+
+let wrap_module_type pmty_desc ~loc ~attrs =
+  { pmty_desc
+  ; pmty_loc = loc
+  ; pmty_attributes = attrs
+  }
+
+let wrap_structure_item pstr_desc ~loc =
+  { pstr_desc
+  ; pstr_loc = loc
+  }
+
+let wrap_signature_item psig_desc ~loc =
+  { psig_desc
+  ; psig_loc = loc
+  }
+
+let wrap_core_type ptyp_desc ~loc ~attrs =
+  { ptyp_desc
+  ; ptyp_attributes = attrs
+  ; ptyp_loc = loc
+  ; ptyp_loc_stack = []
+  }
+
 module Feature : sig
   type t =
     | Language_extension of Language_extension.t
@@ -337,12 +374,9 @@ module type AST_syntactic_category = sig
       [fun tm -> tm.pCAT_loc] for the appropriate syntactic category [CAT]. *)
   val location : ast -> Location.t
 
-  (** Turn an [ast_desc] into an [ast] by adding the appropriate metadata.  When
-      creating [ast] nodes afresh to embed our novel syntax, the location should
-      be omitted; in this case, it will default to [!Ast_helper.default_loc],
-      which should be [ghost]. *)
+  (** Turn an [ast_desc] into an [ast] by adding the appropriate metadata. *)
   val wrap_desc :
-    ?loc:Location.t -> attrs:Parsetree.attributes -> ast_desc -> ast
+    ast_desc -> loc:Location.t -> attrs:Parsetree.attributes -> ast
 end
 
 module type AST = sig
@@ -350,7 +384,7 @@ module type AST = sig
 
   val embedding_syntax : Embedding_syntax.t
 
-  val make_jane_syntax : Embedded_name.t -> ast -> ast_desc
+  val make_jane_syntax : Embedded_name.t -> ast -> loc:Location.t -> ast_desc
 
   (** Given an AST node, check if it's a representation of a term from one of
       our novel syntactic features; if it is, split it back up into its name and
@@ -441,20 +475,20 @@ module Make_with_attribute
 
     type nonrec ast_desc = ast_desc With_attributes.t
 
-    let wrap_desc ?loc ~attrs:extra_attrs with_attributes =
+    let wrap_desc with_attributes ~loc ~attrs:extra_attrs =
       let { desc; jane_syntax_attributes } : _ With_attributes.t =
         with_attributes
       in
-      wrap_desc ?loc ~attrs:(jane_syntax_attributes @ extra_attrs) desc
+      wrap_desc desc ~loc ~attrs:(jane_syntax_attributes @ extra_attrs)
 
-    let make_jane_syntax name ast : _ With_attributes.t =
+    let make_jane_syntax name ast ~loc : _ With_attributes.t =
       let original_attributes = attributes ast in
       let attr =
         { attr_name =
             { txt = Embedded_name.to_string name
-            ; loc = !Ast_helper.default_loc
+            ; loc
             }
-        ; attr_loc = !Ast_helper.default_loc
+        ; attr_loc = loc
         ; attr_payload = PStr []
         }
       in
@@ -501,13 +535,13 @@ module Make_with_extension_node
 
     let embedding_syntax = Embedding_syntax.Extension_node
 
-    let make_jane_syntax name ast =
+    let make_jane_syntax name ast ~loc =
       make_extension_use
         ast
         ~extension_node:
           (make_extension_node
             ({ txt = Embedded_name.to_string name
-              ; loc = !Ast_helper.default_loc },
+             ; loc },
               PStr []))
 
     let match_jane_syntax ast =
@@ -535,7 +569,7 @@ module Type_AST_syntactic_category = struct
 
   let location typ = typ.ptyp_loc
 
-  let wrap_desc ?loc ~attrs = Ast_helper.Typ.mk ?loc ~attrs
+  let wrap_desc = wrap_core_type
 
   let attributes typ = typ.ptyp_attributes
   let with_attributes typ ptyp_attributes = { typ with ptyp_attributes }
@@ -565,7 +599,7 @@ module Expression = Make_with_attribute (struct
 
   let location expr = expr.pexp_loc
 
-  let wrap_desc ?loc ~attrs = Ast_helper.Exp.mk ?loc ~attrs
+  let wrap_desc = wrap_expression
 
   let desc expr = expr.pexp_desc
   let attributes expr = expr.pexp_attributes
@@ -581,7 +615,7 @@ module Pattern = Make_with_attribute (struct
 
   let location pat = pat.ppat_loc
 
-  let wrap_desc ?loc ~attrs = Ast_helper.Pat.mk ?loc ~attrs
+  let wrap_desc = wrap_pattern
 
   let desc pat = pat.ppat_desc
   let attributes pat = pat.ppat_attributes
@@ -597,7 +631,7 @@ module Module_type = Make_with_attribute (struct
 
     let location mty = mty.pmty_loc
 
-    let wrap_desc ?loc ~attrs = Ast_helper.Mty.mk ?loc ~attrs
+    let wrap_desc = wrap_module_type
 
     let desc mty = mty.pmty_desc
     let attributes mty = mty.pmty_attributes
@@ -618,9 +652,9 @@ module Signature_item = Make_with_extension_node (struct
 
     (* The attributes are only set in [ast_mapper], so requiring them to be
        empty here is fine, as there won't be any to set in that case. *)
-    let wrap_desc ?loc ~attrs =
+    let wrap_desc desc ~loc ~attrs =
       match attrs with
-      | [] -> Ast_helper.Sig.mk ?loc
+      | [] -> wrap_signature_item desc ~loc
       | _ :: _ ->
           Misc.fatal_errorf
             "Jane syntax: Cannot put attributes on a signature item"
@@ -661,9 +695,9 @@ module Structure_item = Make_with_extension_node (struct
 
     (* The attributes are only set in [ast_mapper], so requiring them to be
        empty here is fine, as there won't be any to set in that case. *)
-    let wrap_desc ?loc ~attrs =
+    let wrap_desc desc ~loc ~attrs =
       match attrs with
-      | [] -> Ast_helper.Str.mk ?loc
+      | [] -> wrap_structure_item desc ~loc
       | _ :: _ ->
           Misc.fatal_errorf
             "Jane syntax: Cannot put attributes on a structure item"
@@ -725,11 +759,12 @@ module AST = struct
 
   let make_jane_syntax (type ast ast_desc) (t : (ast, ast_desc) t) =
     let (module AST) = to_module t in
-    AST.make_jane_syntax
-
-  let make_entire_jane_syntax t ~loc name ast =
-    make_jane_syntax t [name]
-      (Ast_helper.with_default_loc (Location.ghostify loc) ast)
+    fun name ast ~loc ->
+      if not loc.loc_ghost then
+        Location.raise_errorf
+          loc
+          "~loc argument to [make_jane_syntax] is not a ghost location";
+      AST.make_jane_syntax name ast ~loc
 
   (** Generically lift our custom ASTs for our novel syntax from OCaml ASTs. *)
   let make_of_ast (type ast ast_desc) (t : (ast, ast_desc) t) ~of_ast_internal =
