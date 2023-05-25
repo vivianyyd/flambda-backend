@@ -97,7 +97,7 @@ module TyVarEnv : sig
   (* evaluate with a locally extended set of univars *)
 
   val make_poly_univars :
-    reason:(string -> Layout.annotation_context) ->
+    context:(string -> Layout.annotation_context) ->
     string Location.loc list -> type_vars_layouts -> poly_univars
   (* see mli file *)
 
@@ -232,12 +232,12 @@ end = struct
       f
       ~finally:(fun () -> univars := old_univars)
 
-  let make_poly_univars ~reason vars layouts =
+  let make_poly_univars ~context vars layouts =
     let mk_pair v l =
       let name = v.txt in
       let original_layout = Layout.of_annotation_option_default l
                               ~default:(Layout.value ~why:Univar)
-                              ~reason:(reason name)
+                              ~context:(context name)
       in
       let layout_info = { original_layout; defaulted = Option.is_none l } in
       name, newvar ~name original_layout, layout_info
@@ -835,7 +835,7 @@ and transl_type_aux env policy mode styp =
       let typed_vars = make_typed_univars vars layouts in
       begin_def();
       let new_univars =
-        TyVarEnv.make_poly_univars ~reason:(fun v -> Univar v) vars layouts
+        TyVarEnv.make_poly_univars ~context:(fun v -> Univar v) vars layouts
       in
       let cty = TyVarEnv.with_univars new_univars begin fun () ->
         transl_type env policy mode st
@@ -889,7 +889,7 @@ and transl_type_aux env policy mode styp =
       let cty = transl_type env policy mode inner_type in
       let cty_expr = cty.ctyp_type in
       let layout =
-        Layout.of_annotation ~reason:(Type_variable "XXX layouts")
+        Layout.of_annotation ~context:(Type_variable "XXX layouts")
           layout_annot
       in
       begin match constrain_type_layout env cty_expr layout with
@@ -1055,7 +1055,7 @@ let transl_type_scheme env styp =
      let typed_vars = make_typed_univars vars layouts in
      begin_def();
      let univars =
-       TyVarEnv.make_poly_univars ~reason:(fun v -> Univar v) vars layouts
+       TyVarEnv.make_poly_univars ~context:(fun v -> Univar v) vars layouts
      in
      let typ = transl_simple_type env ~univars ~closed:true Alloc_mode.Global st in
      end_def();

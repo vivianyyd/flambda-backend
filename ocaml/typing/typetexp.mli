@@ -30,7 +30,7 @@ module TyVarEnv : sig
 
   type poly_univars
   val make_poly_univars :
-    reason:(string -> Layout.annotation_context) ->
+    context:(string -> Layout.annotation_context) ->
     string Location.loc list ->
     Asttypes.layout_annotation option list ->
     poly_univars

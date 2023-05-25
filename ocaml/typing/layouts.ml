@@ -379,21 +379,21 @@ module Layout = struct
     | Value -> fresh_layout (Sort Sort.value) ~why
     | Void -> fresh_layout (Sort Sort.void) ~why
 
-  let of_annotation ~reason Location.{ loc; txt = const } =
-    of_const ~why:(Annotated (reason, loc)) const
+  let of_annotation ~context Location.{ loc; txt = const } =
+    of_const ~why:(Annotated (context, loc)) const
 
-  let of_annotation_option ~reason = Option.map (of_annotation ~reason)
+  let of_annotation_option ~context = Option.map (of_annotation ~context)
 
-  let of_annotation_option_default ~default ~reason =
-    Option.fold ~none:default ~some:(of_annotation ~reason)
+  let of_annotation_option_default ~default ~context =
+    Option.fold ~none:default ~some:(of_annotation ~context)
 
-  let of_attributes ~legacy_immediate ~reason attrs =
+  let of_attributes ~legacy_immediate ~context attrs =
     Builtin_attributes.layout ~legacy_immediate attrs |>
-    Result.map (of_annotation_option ~reason)
+    Result.map (of_annotation_option ~context)
 
-  let of_attributes_default ~legacy_immediate ~reason ~default attrs =
+  let of_attributes_default ~legacy_immediate ~context ~default attrs =
     Builtin_attributes.layout ~legacy_immediate attrs |>
-    Result.map (of_annotation_option_default ~default ~reason)
+    Result.map (of_annotation_option_default ~default ~context)
 
   let for_boxed_record ~all_void =
     if all_void then immediate ~why:Empty_record else value ~why:Boxed_record

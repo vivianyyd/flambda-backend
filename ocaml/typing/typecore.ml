@@ -5383,7 +5383,7 @@ and type_expect_
   | Pexp_newtype({txt=name}, sbody, lay) ->
       let layout =
         match Layout.of_attributes_default ~legacy_immediate:false
-                ~reason:(Newtype_declaration name)
+                ~context:(Newtype_declaration name)
                 ~default:(Layout.value ~why:Univar) sexp.pexp_attributes
         with
         | Ok l -> l

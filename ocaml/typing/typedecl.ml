@@ -84,13 +84,13 @@ open Typedtree
 
 exception Error of Location.t * error
 
-let layout_of_attributes ~legacy_immediate ~reason attrs =
-  match Layout.of_attributes ~legacy_immediate ~reason attrs with
+let layout_of_attributes ~legacy_immediate ~context attrs =
+  match Layout.of_attributes ~legacy_immediate ~context attrs with
   | Ok l -> l
   | Error { loc; txt } -> raise (Error (loc, Layout_not_enabled txt))
 
-let layout_of_attributes_default ~legacy_immediate ~reason ~default attrs =
-  match Layout.of_attributes_default ~legacy_immediate ~reason ~default attrs with
+let layout_of_attributes_default ~legacy_immediate ~context ~default attrs =
+  match Layout.of_attributes_default ~legacy_immediate ~context ~default attrs with
   | Ok l -> l
   | Error { loc; txt } -> raise (Error (loc, Layout_not_enabled txt))
 
@@ -192,7 +192,7 @@ let enter_type rec_flag env sdecl (id, uid) =
     (* We set ~legacy_immediate to true because we're looking at a declaration
        that was already allowed to be [@@immediate] *)
     layout_of_attributes_default
-      ~legacy_immediate:true ~reason:(Type_declaration path)
+      ~legacy_immediate:true ~context:(Type_declaration path)
       ~default:(Layout.any ~why:Initial_typedecl_env)
       sdecl.ptype_attributes
   in
@@ -227,7 +227,7 @@ let enter_type rec_flag env sdecl (id, uid) =
           (fun (param, _) ->
              let layout =
                layout_of_attributes_default ~legacy_immediate:false
-                 ~reason:(Type_parameter (path, parameter_name param))
+                 ~context:(Type_parameter (path, parameter_name param))
                  ~default:(Layout.value ~why:Type_argument)
                  param.ptyp_attributes
              in
@@ -350,7 +350,7 @@ let make_params env path params =
     try
       let layout =
         layout_of_attributes_default ~legacy_immediate:false
-          ~reason:(Type_parameter (path, parameter_name sty))
+          ~context:(Type_parameter (path, parameter_name sty))
           ~default:(Layout.of_new_sort_var ~why:Unannotated_type_parameter)
           sty.ptyp_attributes
       in
@@ -460,7 +460,7 @@ let make_constructor
         | vs ->
            Ctype.begin_def();
            Some (TyVarEnv.make_poly_univars
-                   ~reason:(fun v -> Constructor_type_parameter (cstr_path, v))
+                   ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
                    vs slays), true
       in
       let args, targs =
@@ -642,7 +642,7 @@ let transl_declaration env sdecl (id, uid) =
   let layout_annotation =
     (* We set legacy_immediate to true because you were already allowed to write
        [@@immediate] on declarations.  *)
-    layout_of_attributes ~legacy_immediate:true ~reason:(Type_declaration (Pident id))
+    layout_of_attributes ~legacy_immediate:true ~context:(Type_declaration (Pident id))
       sdecl.ptype_attributes
   in
   let (tman, man) = match sdecl.ptype_manifest with
@@ -2180,7 +2180,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   let layout_annotation =
     layout_of_attributes
       ~legacy_immediate:false
-      ~reason:(With_constraint sdecl.ptype_name.txt)
+      ~context:(With_constraint sdecl.ptype_name.txt)
       sdecl.ptype_attributes
   in
   Ctype.end_def();
@@ -2235,14 +2235,14 @@ let approx_type_decl sdecl_list =
          (* We set legacy_immediate to true because you were already allowed
             to write [@@immediate] on declarations. *)
          layout_of_attributes_default ~legacy_immediate:true
-           ~reason:(Type_declaration (Pident id))
+           ~context:(Type_declaration (Pident id))
            ~default:(Layout.value ~why:Default_type_layout)
            sdecl.ptype_attributes
        in
        let params =
          List.map (fun (styp,_) ->
            layout_of_attributes_default ~legacy_immediate:false
-             ~reason:(Type_parameter (Pident id, parameter_name styp))
+             ~context:(Type_parameter (Pident id, parameter_name styp))
              ~default:(Layout.value ~why:Type_argument)
              styp.ptyp_attributes)
            sdecl.ptype_params
