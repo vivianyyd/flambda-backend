@@ -169,7 +169,9 @@ module T = struct
     let attrs = sub.attributes sub attrs in
     match desc with
     | Ptyp_any -> any ~loc ~attrs ()
-    | Ptyp_var s -> var ~loc ~attrs s
+    | Ptyp_var (s, layout) ->
+        var ~loc ~attrs s
+          (map_opt (map_loc_txt sub sub.layout_annotation) layout)
     | Ptyp_arrow (lab, t1, t2) ->
         arrow ~loc ~attrs lab (sub.typ sub t1) (sub.typ sub t2)
     | Ptyp_tuple tyl -> tuple ~loc ~attrs (List.map (sub.typ sub) tyl)
@@ -179,7 +181,9 @@ module T = struct
         object_ ~loc ~attrs (List.map (object_field sub) l) o
     | Ptyp_class (lid, tl) ->
         class_ ~loc ~attrs (map_loc sub lid) (List.map (sub.typ sub) tl)
-    | Ptyp_alias (t, s) -> alias ~loc ~attrs (sub.typ sub t) s
+    | Ptyp_alias (t, s, layout) ->
+      alias ~loc ~attrs (sub.typ sub t) s
+        (map_opt (map_loc_txt sub sub.layout_annotation) layout)
     | Ptyp_variant (rl, b, ll) ->
         variant ~loc ~attrs (List.map (row_field sub) rl) b ll
     | Ptyp_poly (sl, t, lays) ->
@@ -190,9 +194,6 @@ module T = struct
         package ~loc ~attrs (map_loc sub lid)
           (List.map (map_tuple (map_loc sub) (sub.typ sub)) l)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
-    | Ptyp_layout (t, lay) -> layout ~loc ~attrs
-                                (sub.typ sub t)
-                                (map_loc_txt sub sub.layout_annotation lay)
 
   let map_type_declaration sub
       {ptype_name; ptype_params; ptype_cstrs;

@@ -61,18 +61,17 @@ module Typ = struct
   let attr d a = {d with ptyp_attributes = d.ptyp_attributes @ [a]}
 
   let any ?loc ?attrs () = mk ?loc ?attrs Ptyp_any
-  let var ?loc ?attrs a = mk ?loc ?attrs (Ptyp_var a)
+  let var ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_var (a, b))
   let arrow ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_arrow (a, b, c))
   let tuple ?loc ?attrs a = mk ?loc ?attrs (Ptyp_tuple a)
   let constr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_constr (a, b))
   let object_ ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_object (a, b))
   let class_ ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_class (a, b))
-  let alias ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_alias (a, b))
+  let alias ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_alias (a, b, c))
   let variant ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_variant (a, b, c))
   let poly ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_poly (a, b, c))
   let package ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_package (a, b))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ptyp_extension a)
-  let layout ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_layout (a, b))
 
   let force_poly t =
     match t.ptyp_desc with
@@ -94,24 +93,24 @@ module Typ = struct
            resolve this knot. *)
         match t.ptyp_desc with
         | Ptyp_any -> Ptyp_any
-        | Ptyp_var x ->
+        | Ptyp_var (x, layout) ->
             check_variable var_names t.ptyp_loc x;
-            Ptyp_var x
+            Ptyp_var (x, layout)
         | Ptyp_arrow (label,core_type,core_type') ->
             Ptyp_arrow(label, loop core_type, loop core_type')
         | Ptyp_tuple lst -> Ptyp_tuple (List.map loop lst)
         | Ptyp_constr( { txt = Longident.Lident s }, [])
           when List.mem s var_names ->
-            Ptyp_var s
+            Ptyp_var (s, None)
         | Ptyp_constr(longident, lst) ->
             Ptyp_constr(longident, List.map loop lst)
         | Ptyp_object (lst, o) ->
             Ptyp_object (List.map loop_object_field lst, o)
         | Ptyp_class (longident, lst) ->
             Ptyp_class (longident, List.map loop lst)
-        | Ptyp_alias(core_type, string) ->
-            check_variable var_names t.ptyp_loc string;
-            Ptyp_alias(loop core_type, string)
+        | Ptyp_alias(core_type, string_opt, layout) ->
+            Option.iter (check_variable var_names t.ptyp_loc) string_opt;
+            Ptyp_alias(loop core_type, string_opt, layout)
         | Ptyp_variant(row_field_list, flag, lbl_lst_option) ->
             Ptyp_variant(List.map loop_row_field row_field_list,
                          flag, lbl_lst_option)
@@ -123,8 +122,6 @@ module Typ = struct
             Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
         | Ptyp_extension (s, arg) ->
             Ptyp_extension (s, arg)
-        | Ptyp_layout (t, layout) ->
-            Ptyp_layout (loop t, layout)
       in
       {t with ptyp_desc = desc}
     and loop_row_field field =

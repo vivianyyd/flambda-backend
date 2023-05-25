@@ -168,7 +168,9 @@ and eq_core_type_desc :
   (core_type_desc * core_type_desc) -> 'result =
   function
   | (Ptyp_any, Ptyp_any) -> true
-  | (Ptyp_var a0, Ptyp_var b0) -> eq_string (a0, b0)
+  | (Ptyp_var (a0,a1), Ptyp_var (b0,b1)) ->
+      (eq_string (a0, b0)) &&
+      (eq_option (Asttypes.eq_loc Asttypes.eq_const_layout) (a1,b1))
   | (Ptyp_arrow (a0, a1, a2), Ptyp_arrow (b0, b1, b2)) ->
       ((Asttypes.eq_label (a0, b0)) && (eq_core_type (a1, b1))) &&
         (eq_core_type (a2, b2))
@@ -182,8 +184,9 @@ and eq_core_type_desc :
       ((Asttypes.eq_loc Longident.eq_t (a0, b0)) &&
          (eq_list eq_core_type (a1, b1)))
         && (eq_list Asttypes.eq_label (a2, b2))
-  | (Ptyp_alias (a0, a1), Ptyp_alias (b0, b1)) ->
-      (eq_core_type (a0, b0)) && (eq_string (a1, b1))
+  | (Ptyp_alias (a0, a1, a2), Ptyp_alias (b0, b1, b2)) ->
+      (eq_core_type (a0, b0)) && (eq_option eq_string (a1, b1)) &&
+      (eq_option (Asttypes.eq_loc Asttypes.eq_const_layout) (a2, b2))
   | (Ptyp_variant (a0, a1, a2), Ptyp_variant (b0, b1, b2)) ->
       ((eq_list eq_row_field (a0, b0)) && (eq_bool (a1, b1))) &&
         (eq_option (eq_list Asttypes.eq_label) (a2, b2))
@@ -191,8 +194,6 @@ and eq_core_type_desc :
      (eq_list eq_string (a0, b0)) && (eq_core_type (a1, b1)) &&
      (eq_list (eq_option (Asttypes.eq_loc Asttypes.eq_const_layout)) (a2, b2))
   | (Ptyp_package a0, Ptyp_package b0) -> eq_package_type (a0, b0)
-  | (Ptyp_layout (a0, a1), Ptyp_layout (b0, b1)) ->
-       (eq_core_type (a0, b0)) && (Asttypes.eq_const_layout (a1, b1))
   | (_, _) -> false
 and eq_core_type : (core_type * core_type) -> 'result =
   fun

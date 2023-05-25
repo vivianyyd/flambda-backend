@@ -28,28 +28,28 @@ failure
 (***************************************)
 (* Test 1: annotation on type variable *)
 
-let x : (int : value) = 5
-let x : (int : immediate) = 5
+let x : int as ('a : value) = 5
+let x : int as ('a : immediate) = 5
 ;;
 [%%expect {|
 val x : int = 5
 val x : int = 5
 |}]
 
-let x : (int : any) = 5;;
+let x : int as ('a : any) = 5;;
 
 [%%expect{|
 extension
 |}]
 (* CR layouts: fix when [any] becomes available in [layouts] *)
 
-let x : ((int : immediate) list : value) = [3;4;5]
+let x : (int as ('a : immediate)) list as ('b : value) = [3;4;5]
 ;;
 [%%expect {|
 val x : int list = [3; 4; 5]
 |}]
 
-let x : (int list : immediate) = [3;4;5]
+let x : int list as ('a : immediate) = [3;4;5]
 ;;
 [%%expect {|
 Line 1, characters 8-30:
@@ -355,3 +355,8 @@ type (_ : value) g =
 extension
 |}]
 
+type t = int as (_ : immediate)
+
+[%%expect {|
+extension
+|}]

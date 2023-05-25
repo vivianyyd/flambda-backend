@@ -111,7 +111,7 @@ let rec add_type bv ty =
          | Otag (_, t) -> add_type bv t
          | Oinherit t -> add_type bv t) fl
   | Ptyp_class(c, tl) -> add bv c; List.iter (add_type bv) tl
-  | Ptyp_alias(t, _) -> add_type bv t
+  | Ptyp_alias(t, _, _) -> add_type bv t
   | Ptyp_variant(fl, _, _) ->
       List.iter
         (fun {prf_desc; _} -> match prf_desc with
@@ -121,7 +121,6 @@ let rec add_type bv ty =
   | Ptyp_poly(_, t, _) -> add_type bv t
   | Ptyp_package pt -> add_package_type bv pt
   | Ptyp_extension e -> handle_extension e
-  | Ptyp_layout(t, _) -> add_type bv t
 
 and add_type_jst _bv : Jane_syntax.Core_type.t -> _ = function
   | _ -> .

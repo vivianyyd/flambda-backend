@@ -162,8 +162,7 @@ module type S = sig
   type 'a s = 'a -> int constraint 'a = t
 end;;
 [%%expect{|
-module type S =
-  sig type t : void type 'a s = 'a -> int constraint 'a = t end
+module type S = sig type t : void type 'a s = 'a -> int constraint 'a = t end
 |}]
 
 module F2 (X : sig val x : t_void end) = struct

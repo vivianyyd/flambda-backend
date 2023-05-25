@@ -69,7 +69,8 @@ module Typ :
     val attr: core_type -> attribute -> core_type
 
     val any: ?loc:loc -> ?attrs:attrs -> unit -> core_type
-    val var: ?loc:loc -> ?attrs:attrs -> string -> core_type
+    val var: ?loc:loc -> ?attrs:attrs -> string -> layout_annotation option
+             -> core_type
     val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type -> core_type
                -> core_type
     val tuple: ?loc:loc -> ?attrs:attrs -> core_type list -> core_type
@@ -77,7 +78,8 @@ module Typ :
     val object_: ?loc:loc -> ?attrs:attrs -> object_field list
                    -> closed_flag -> core_type
     val class_: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> core_type
-    val alias: ?loc:loc -> ?attrs:attrs -> core_type -> string -> core_type
+    val alias: ?loc:loc -> ?attrs:attrs ->
+      core_type -> string option -> layout_annotation option -> core_type
     val variant: ?loc:loc -> ?attrs:attrs -> row_field list -> closed_flag
                  -> label list option -> core_type
     val poly: ?loc:loc -> ?attrs:attrs -> str list -> core_type
@@ -85,8 +87,6 @@ module Typ :
     val package: ?loc:loc -> ?attrs:attrs -> lid -> (lid * core_type) list
                  -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
-    val layout: ?loc:loc -> ?attrs:attrs -> core_type
-                 -> layout_annotation -> core_type
 
     val force_poly: core_type -> core_type
 

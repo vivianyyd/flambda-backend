@@ -104,10 +104,11 @@ let get_unboxed_from_attributes sdecl =
   | false, false -> None
 
 (* Used for layout error reporting *)
-(* CR aspectorzabusky: This feels like it must exist somewhere *)
+(* CR layouts: This is wrong: type parameters can be other things, with
+   constraints *)
 let parameter_name sty = match sty.ptyp_desc with
   | Ptyp_any -> "_"
-  | Ptyp_var name -> "'" ^ name
+  | Ptyp_var (name, _) -> "'" ^ name
   | _ -> Misc.fatal_error
            "Type parameter was neither [Ptyp_any] nor [Ptyp_var _]"
 
@@ -289,7 +290,7 @@ let is_float env ty =
 let is_fixed_type sd =
   let rec has_row_var sty =
     match sty.ptyp_desc with
-      Ptyp_alias (sty, _) -> has_row_var sty
+      Ptyp_alias (sty, _, _) -> has_row_var sty
     | Ptyp_class _
     | Ptyp_object (_, Open)
     | Ptyp_variant (_, Open, _)
@@ -1936,7 +1937,7 @@ let rec parse_native_repr_attributes env core_type ty rmode ~global_repr =
       parse_native_repr_attributes env ct2 t2 (prim_const_mode mret) ~global_repr
     in
     ((mode,repr_arg) :: repr_args, repr_res)
-  | (Ptyp_poly (_, t, _) | Ptyp_alias (t, _)), _, _ ->
+  | (Ptyp_poly (_, t, _) | Ptyp_alias (t, _, _)), _, _ ->
      parse_native_repr_attributes env t ty rmode ~global_repr
   | _ ->
      let rmode =

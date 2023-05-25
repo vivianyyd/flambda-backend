@@ -900,7 +900,8 @@ let core_type sub ct =
   let attrs = sub.attributes sub ct.ctyp_attributes in
   let desc = match ct.ctyp_desc with
       Ttyp_any -> Ptyp_any
-    | Ttyp_var s -> Ptyp_var s
+    | Ttyp_var (s, layout) ->
+        Ptyp_var (s, Option.map (fun l -> mkloc l loc) layout)
     | Ttyp_arrow (label, ct1, ct2) ->
         Ptyp_arrow (label, sub.typ sub ct1, sub.typ sub ct2)
     | Ttyp_tuple list -> Ptyp_tuple (List.map (sub.typ sub) list)
@@ -912,8 +913,8 @@ let core_type sub ct =
           (List.map (sub.object_field sub) list, o)
     | Ttyp_class (_path, lid, list) ->
         Ptyp_class (map_loc sub lid, List.map (sub.typ sub) list)
-    | Ttyp_alias (ct, s) ->
-        Ptyp_alias (sub.typ sub ct, s)
+    | Ttyp_alias (ct, s, lay) ->
+        Ptyp_alias (sub.typ sub ct, s, Option.map (fun l -> mkloc l loc) lay)
     | Ttyp_variant (list, bool, labels) ->
         Ptyp_variant (List.map (sub.row_field sub) list, bool, labels)
     | Ttyp_poly (list, ct) ->
@@ -923,8 +924,6 @@ let core_type sub ct =
         let layouts = List.map (fun lay -> Option.map add_loc lay) layouts in
         Ptyp_poly (vars, sub.typ sub ct, layouts)
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
-    | Ttyp_layout (ct, l) ->
-        Ptyp_layout (sub.typ sub ct, mkloc l loc)
   in
   Typ.mk ~loc ~attrs desc
 

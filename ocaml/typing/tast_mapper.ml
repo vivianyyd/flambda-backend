@@ -693,7 +693,9 @@ let typ sub x =
   let ctyp_desc =
     match x.ctyp_desc with
     | Ttyp_any
-    | Ttyp_var _ as d -> d
+    | Ttyp_var (_,None) as d -> d
+    | Ttyp_var (s, Some layout) ->
+        Ttyp_var (s, Some (sub.layout_annotation sub layout))
     | Ttyp_arrow (label, ct1, ct2) ->
         Ttyp_arrow (label, sub.typ sub ct1, sub.typ sub ct2)
     | Ttyp_tuple list -> Ttyp_tuple (List.map (sub.typ sub) list)
@@ -707,16 +709,15 @@ let typ sub x =
            lid,
            List.map (sub.typ sub) list
           )
-    | Ttyp_alias (ct, s) ->
-        Ttyp_alias (sub.typ sub ct, s)
+    | Ttyp_alias (ct, s, layout) ->
+        Ttyp_alias (sub.typ sub ct, s,
+                    Option.map (sub.layout_annotation sub) layout)
     | Ttyp_variant (list, closed, labels) ->
         Ttyp_variant (List.map (sub.row_field sub) list, closed, labels)
     | Ttyp_poly (vars, ct) ->
         Ttyp_poly (List.map (var_layout sub) vars, sub.typ sub ct)
     | Ttyp_package pack ->
         Ttyp_package (sub.package_type sub pack)
-    | Ttyp_layout (ct, l) ->
-        Ttyp_layout (sub.typ sub ct, sub.layout_annotation sub l)
   in
   {x with ctyp_desc; ctyp_env}
 

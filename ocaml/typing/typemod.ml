@@ -510,8 +510,12 @@ let type_decl_is_alias sdecl = (* assuming no explicit constraint *)
        match
          List.iter2 (fun x (y, _) ->
              match x, y with
-               {ptyp_desc=Ptyp_var sx}, {ptyp_desc=Ptyp_var sy}
-                  when sx = sy -> ()
+               {ptyp_desc=Ptyp_var (sx,lx)}, {ptyp_desc=Ptyp_var (sy,ly)}
+                  when sx = sy &&
+                       Option.equal
+                         (Location.compare_txt Layout.equal_const)
+                         lx ly
+                  -> ()
              | _, _ -> raise Exit)
            stl sdecl.ptype_params;
        with

@@ -21,9 +21,9 @@ failure
 (***************************************)
 (* Test 1: annotation on type variable *)
 
-let x : (int : value) = 5
-let x : (int : immediate) = 5
-let x : (int : any) = 5;;
+let x : int as ('a: value) = 5
+let x : int as ('a : immediate) = 5
+let x : int as ('a : any) = 5;;
 
 [%%expect{|
 success
@@ -298,4 +298,10 @@ type (_ : value) g =
 
 [%%expect {|
 type _ g = MkG : ('a : immediate). 'a g
+|}]
+
+type t = int as (_ : immediate)
+
+[%%expect {|
+type t = int
 |}]

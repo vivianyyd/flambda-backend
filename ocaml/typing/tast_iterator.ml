@@ -459,7 +459,8 @@ let typ sub {ctyp_desc; ctyp_env; _} =
   sub.env sub ctyp_env;
   match ctyp_desc with
   | Ttyp_any   -> ()
-  | Ttyp_var _ -> ()
+  | Ttyp_var (_, layout) ->
+      Option.iter (sub.layout_annotation sub) layout
   | Ttyp_arrow (_, ct1, ct2) ->
       sub.typ sub ct1;
       sub.typ sub ct2
@@ -467,13 +468,14 @@ let typ sub {ctyp_desc; ctyp_env; _} =
   | Ttyp_constr (_, _, list) ->  List.iter (sub.typ sub) list
   | Ttyp_object (list, _) -> List.iter (sub.object_field sub) list
   | Ttyp_class (_, _, list) -> List.iter (sub.typ sub) list
-  | Ttyp_alias (ct, _) -> sub.typ sub ct
+  | Ttyp_alias (ct, _, layout) ->
+    sub.typ sub ct;
+    Option.iter (sub.layout_annotation sub) layout
   | Ttyp_variant (list, _, _) -> List.iter (sub.row_field sub) list
   | Ttyp_poly (vars, ct) ->
       List.iter (fun (_, l) -> Option.iter (sub.layout_annotation sub) l) vars;
       sub.typ sub ct
   | Ttyp_package pack -> sub.package_type sub pack
-  | Ttyp_layout (ct, l) -> sub.typ sub ct; sub.layout_annotation sub l
 
 let class_structure sub {cstr_self; cstr_fields; _} =
   sub.pat sub cstr_self;

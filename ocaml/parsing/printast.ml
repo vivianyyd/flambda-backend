@@ -162,6 +162,12 @@ let tyvar ppf s =
   else
     Format.fprintf ppf "'%s" s
 
+let const_layout ppf lay =
+  Format.fprintf ppf "%s" (const_layout_to_string lay)
+
+let layout_annotation i ppf layout =
+  line i ppf "%s" (const_layout_to_string layout.txt)
+
 let var_layout ~print_quote ppf (v, l) =
   let pptv ppf =
     if print_quote
@@ -172,10 +178,10 @@ let var_layout ~print_quote ppf (v, l) =
   | None -> fprintf ppf " %a" pptv v.txt
   | Some lay -> fprintf ppf " (%a : %a)"
                   pptv v.txt
-                  Pprintast.const_layout lay.txt
+                  const_layout lay.txt
 
-let typevars ppf vs =
-  List.iter (fun x -> fprintf ppf " %a" tyvar x.txt) vs
+let typevars ppf (vs, ls) =
+  List.iter2 (fun v l -> var_layout ~print_quote:true ppf (v, l)) vs ls
 
 let rec core_type i ppf x =
   line i ppf "core_type %a\n" fmt_location x.ptyp_loc;
@@ -183,7 +189,9 @@ let rec core_type i ppf x =
   let i = i+1 in
   match x.ptyp_desc with
   | Ptyp_any -> line i ppf "Ptyp_any\n";
-  | Ptyp_var (s) -> line i ppf "Ptyp_var %s\n" s;
+  | Ptyp_var (s, layout) ->
+      line i ppf "Ptyp_var %s\n" s;
+      option i layout_annotation ppf layout
   | Ptyp_arrow (l, ct1, ct2) ->
       line i ppf "Ptyp_arrow\n";
       arg_label i ppf l;
@@ -215,9 +223,10 @@ let rec core_type i ppf x =
   | Ptyp_class (li, l) ->
       line i ppf "Ptyp_class %a\n" fmt_longident_loc li;
       list i core_type ppf l
-  | Ptyp_alias (ct, s) ->
-      line i ppf "Ptyp_alias \"%s\"\n" s;
+  | Ptyp_alias (ct, s, lay_opt) ->
+      line i ppf "Ptyp_alias \"%s\"\n" (Option.value s ~default:"_");
       core_type i ppf ct;
+      option i layout_annotation ppf lay_opt
   | Ptyp_poly (sl, ct, lays) ->
       line i ppf "Ptyp_poly%a\n" typevars (sl, lays);
       core_type i ppf ct;
@@ -227,10 +236,6 @@ let rec core_type i ppf x =
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
-  | Ptyp_layout (t, layout) ->
-      line i ppf "Ptyp_layout %a"
-        Pprintast.const_layout layout.txt;
-      core_type i ppf t
 
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident_loc s;

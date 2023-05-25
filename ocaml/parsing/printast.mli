@@ -32,6 +32,7 @@ val structure: int -> formatter -> structure -> unit
 val payload: int -> formatter -> payload -> unit
 val core_type: int -> formatter -> core_type -> unit
 
+val const_layout: formatter -> Asttypes.const_layout -> unit
 val const_layout_to_string: Asttypes.const_layout -> string
 
 val tyvar: Format.formatter -> string -> unit

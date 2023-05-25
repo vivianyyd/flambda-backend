@@ -151,6 +151,9 @@ let arg_label i ppf = function
 let typevars ppf vs =
   List.iter (fun x -> fprintf ppf " %a" Printast.tyvar x.txt) vs
 
+let layout_annotation i ppf layout =
+  line i ppf "%s" (Layouts.Layout.string_of_const layout.txt)
+
 let layout_annotation_option ppf = function
   | None -> fprintf ppf "--"
   | Some lay -> fprintf ppf "%s" (Layouts.Layout.string_of_const lay.txt)
@@ -166,7 +169,9 @@ let rec core_type i ppf x =
   let i = i+1 in
   match x.ptyp_desc with
   | Ptyp_any -> line i ppf "Ptyp_any\n";
-  | Ptyp_var (s) -> line i ppf "Ptyp_var %s\n" s;
+  | Ptyp_var (s, layout) ->
+      line i ppf "Ptyp_var %s\n" s;
+      option i layout_annotation ppf layout
   | Ptyp_arrow (l, ct1, ct2) ->
       line i ppf "Ptyp_arrow\n";
       arg_label i ppf l;
@@ -198,9 +203,10 @@ let rec core_type i ppf x =
   | Ptyp_class (li, l) ->
       line i ppf "Ptyp_class %a\n" fmt_longident_loc li;
       list i core_type ppf l
-  | Ptyp_alias (ct, s) ->
-      line i ppf "Ptyp_alias \"%s\"\n" s;
+  | Ptyp_alias (ct, s, lay_opt) ->
+      line i ppf "Ptyp_alias \"%s\"\n" (Option.value s ~default:"_");
       core_type i ppf ct;
+      option i layout_annotation ppf lay_opt
   | Ptyp_poly (sl, ct, lays) ->
       line i ppf "Ptyp_poly%a\n"
         (fun ppf ->
@@ -215,10 +221,6 @@ let rec core_type i ppf x =
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
-  | Ptyp_layout (ty, l) ->
-      line i ppf "Ptyp_layout\n";
-      core_type i ppf ty;
-      fprintf ppf "%s" (Layouts.Layout.string_of_const l.txt)
   )
 
 and package_with i ppf (s, t) =

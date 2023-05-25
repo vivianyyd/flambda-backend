@@ -720,23 +720,16 @@ and core_type =
 
 and core_type_desc =
     Ttyp_any
-  | Ttyp_var of string
+  | Ttyp_var of string * const_layout option
   | Ttyp_arrow of arg_label * core_type * core_type
   | Ttyp_tuple of core_type list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list
   | Ttyp_object of object_field list * closed_flag
   | Ttyp_class of Path.t * Longident.t loc * core_type list
-  | Ttyp_alias of core_type * string
+  | Ttyp_alias of core_type * string option * const_layout option
   | Ttyp_variant of row_field list * closed_flag * label list option
   | Ttyp_poly of (string * Asttypes.const_layout option) list * core_type
   | Ttyp_package of package_type
-  | Ttyp_layout of core_type * Asttypes.const_layout
-      (* The expression level equivalent of Ttyp_layout is Pexp_constraint,
-         which appears only as an exp_extra. In types, though, we store
-         it right in the core_type_desc. This is because, post-type-checking,
-         we don't analyze types in the same way we do expressions, for which
-         keeping inessential information (like the user-written type constraint)
-         off to the side is beneficial. *)
 
 and package_type = {
   pack_path : Path.t;

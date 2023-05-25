@@ -86,7 +86,8 @@ and core_type =
 
 and core_type_desc =
   | Ptyp_any  (** [_] *)
-  | Ptyp_var of string  (** A type variable such as ['a] *)
+  | Ptyp_var of string * layout_annotation option
+      (** A type variable such as ['a] or [('a : immediate)] *)
   | Ptyp_arrow of arg_label * core_type * core_type
       (** [Ptyp_arrow(lbl, T1, T2)] represents:
             - [T1 -> T2]    when [lbl] is
@@ -121,7 +122,11 @@ and core_type_desc =
             - [T #tconstr]             when [l=[T]],
             - [(T1, ..., Tn) #tconstr] when [l=[T1 ; ... ; Tn]].
          *)
-  | Ptyp_alias of core_type * string  (** [T as 'a]. *)
+  | Ptyp_alias of core_type * string option * layout_annotation option
+      (** [T as 'a] or [T as ('a : immediate)] or [T as (_ : immediate)] *)
+      (* XXX layouts RAE: move the layout annotation to use the extensions
+         mechanism *)
+
   | Ptyp_variant of row_field list * closed_flag * label list option
       (** [Ptyp_variant([`A;`B], flag, labels)] represents:
             - [[ `A|`B ]]
@@ -169,9 +174,6 @@ and core_type_desc =
          *)
   | Ptyp_package of package_type  (** [(module S)]. *)
   | Ptyp_extension of extension  (** [[%id]]. *)
-
-  (* XXX layouts RAE: use extension instead *)
-  | Ptyp_layout of core_type * layout_annotation
 
 and type_vars_layouts = layout_annotation option list
   (* the layout annotations associated with a type-variable list,

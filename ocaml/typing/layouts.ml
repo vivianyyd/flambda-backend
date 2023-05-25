@@ -262,6 +262,7 @@ module Layout = struct
     | Constructor_type_parameter of Path.t * string
     | Univar of string
     | Type_variable of string
+    | Type
 
   type creation_reason =
     | Annotated of annotation_context * Location.t
@@ -583,6 +584,8 @@ module Layout = struct
             name
       | Type_variable name ->
           fprintf ppf "the type variable %s" name
+      | Type ->
+          fprintf ppf "a type"
 
     let format_any_creation_reason ppf : any_creation_reason -> unit = function
       | Missing_cmi p ->
@@ -1015,6 +1018,8 @@ module Layout = struct
           fprintf ppf "Univar %S" name
       | Type_variable name ->
           fprintf ppf "Type_variable %S" name
+      | Type ->
+          fprintf ppf "Type"
 
     let any_creation_reason ppf : any_creation_reason -> unit = function
       | Missing_cmi p -> fprintf ppf "Missing_cmi %a" Path.print p

@@ -28,13 +28,6 @@ open Longident
 open Parsetree
 open Ast_helper
 
-let const_layout_to_string = function
-  | Any -> "any"
-  | Value -> "value"
-  | Immediate -> "immediate"
-  | Immediate64 -> "immediate64"
-  | Void -> "void"
-
 let prefix_symbols  = [ '!'; '?'; '~' ] ;;
 let infix_symbols = [ '='; '<'; '>'; '@'; '^'; '|'; '&'; '+'; '-'; '*'; '/';
                       '$'; '%'; '#' ]
@@ -295,9 +288,7 @@ let iter_loc f ctxt {txt; loc = _} = f ctxt txt
 let constant_string f s = pp f "%S" s
 
 let tyvar = Printast.tyvar
-
-let const_layout ppf lay =
-  Format.fprintf ppf "%s" (const_layout_to_string lay)
+let const_layout = Printast.const_layout
 
 let tyvar_layout_loc ~print_quote f (str,layout) =
   let pptv =
@@ -307,7 +298,8 @@ let tyvar_layout_loc ~print_quote f (str,layout) =
   in
   match layout with
   | None -> pptv f str.txt
-  | Some lay -> Format.fprintf f "(%a : %a)" pptv str.txt const_layout lay.txt
+  | Some lay -> Format.fprintf f "(%a : %a)"
+                  pptv str.txt const_layout lay.txt
 let string_quot f x = pp f "`%s" x
 
 let maybe_local_type pty ctxt f c =
@@ -343,8 +335,14 @@ and core_type ctxt f x =
     | Ptyp_arrow (l, ct1, ct2) ->
         pp f "@[<2>%a@;->@;%a@]" (* FIXME remove parens later *)
           (type_with_label ctxt) (l,ct1) (return_type ctxt) ct2
-    | Ptyp_alias (ct, s) ->
-        pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct tyvar s
+    | Ptyp_alias (ct, s, None) ->
+        pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct tyvar (Option.get s)
+    | Ptyp_alias (ct, s, Some lay) ->
+        pp f "@[<2>%a@;as@;(%t :@ %a)@]"
+          (core_type1 ctxt) ct
+          (fun ppf ->
+             match s with None -> fprintf ppf "_" | Some s -> tyvar ppf s)
+          const_layout lay.txt
     | Ptyp_poly ([], ct, []) ->
         core_type ctxt f ct
     | Ptyp_poly (sl, ct, lays) ->
@@ -366,7 +364,9 @@ and core_type1 ctxt f x =
   else
     match x.ptyp_desc with
     | Ptyp_any -> pp f "_";
-    | Ptyp_var s -> tyvar f  s;
+    | Ptyp_var (s, None) -> tyvar f  s;
+    | Ptyp_var (s, Some layout) ->
+        pp f "(%a@;:@;%a)" tyvar s const_layout layout.txt
     | Ptyp_tuple l ->  pp f "(%a)" (list (core_type1 ctxt) ~sep:"@;*@;") l
     | Ptyp_constr (li, l) ->
         pp f (* "%a%a@;" *) "%a%a"

@@ -136,8 +136,9 @@ module T = struct
     | None ->
     sub.attributes sub attrs;
     match desc with
-    | Ptyp_any
-    | Ptyp_var _ -> ()
+    | Ptyp_any -> ()
+    | Ptyp_var (_, lay) ->
+        iter_opt (iter_loc2 sub sub.layout_annotation) lay
     | Ptyp_arrow (_lab, t1, t2) ->
         sub.typ sub t1; sub.typ sub t2
     | Ptyp_tuple tyl -> List.iter (sub.typ sub) tyl
@@ -147,7 +148,9 @@ module T = struct
         List.iter (object_field sub) ol
     | Ptyp_class (lid, tl) ->
         iter_loc sub lid; List.iter (sub.typ sub) tl
-    | Ptyp_alias (t, _) -> sub.typ sub t
+    | Ptyp_alias (t, _, lay) ->
+        sub.typ sub t;
+        iter_opt (iter_loc2 sub sub.layout_annotation) lay
     | Ptyp_variant (rl, _b, _ll) ->
         List.iter (row_field sub) rl
     | Ptyp_poly (_, t, lays) ->
@@ -157,10 +160,6 @@ module T = struct
         iter_loc sub lid;
         List.iter (iter_tuple (iter_loc sub) (sub.typ sub)) l
     | Ptyp_extension x -> sub.extension sub x
-    | Ptyp_layout (t, layout) ->
-        sub.typ sub t;
-        iter_loc sub layout;
-        sub.layout_annotation sub layout.txt
 
   let iter_type_declaration sub
       {ptype_name; ptype_params; ptype_cstrs;
