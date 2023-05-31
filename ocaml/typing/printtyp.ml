@@ -77,14 +77,35 @@ module Int = Misc.Stdlib.Int
    Case (C3). The layout on a universal type variable, like
    [val f : ('a : <<this one>>). 'a -> 'a].
 
-   We should print this layout annotation whenever it is not the
-   default [value]. (* CR layouts reisenberg: update when the default changes *)
+   We should print this layout annotation whenever it is neither the
+   default [value] nor an unfilled sort variable. (But see (X1) below.)
+   (* CR layouts reisenberg: update when the default changes *)
    This is a challenge, though, because the type in a [val] does not
    explicitly quantify its free variables. So we must collect the free
    variables, look to see whether any have interesting layouts, and
    print the whole set of variables if any of them do. This is all
    implemented in [extract_qtvs], used also in a number of other places
    we do quantification (e.g. gadt-syntax constructors).
+
+   Exception (X1). When we are still in the process of inferring a type,
+   there may be an unfilled sort variable. Here is an example:
+
+   {[
+      module M : sig
+        val f : int -> bool -> char
+      end = struct
+        let f true _ = ()
+      end
+   ]}
+
+   The problem is that [f]'s first parameter is conflicted between being
+   [int] and [bool]. But the second parameter in the [struct] will have
+   type ['a : <<sort variable>>]. We generally do not want to print this,
+   however, and so we don't -- except when [-verbose-types] is set.
+
+   We imagine that merlin, when run verbosely, will set [-verbose-types].
+   This will allow an informative type to be printed for e.g. [let f x = x],
+   which can work with any sort.
 *)
 
 (* Print a long identifier *)
@@ -1162,7 +1183,10 @@ let out_layout_option_of_layout layout =
   match Layout.get layout with
   | Const Value -> None
   | Const clay -> Some (Olay_const clay)
-  | Var v -> Some (Olay_var (Sort.var_name v))
+  | Var v -> (* This handles (X1). *)
+    if !Clflags.verbose_types
+    then Some (Olay_var (Sort.var_name v))
+    else None
 
 let rec tree_of_typexp mode ty =
   let px = proxy ty in
