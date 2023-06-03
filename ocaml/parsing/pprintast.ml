@@ -288,7 +288,7 @@ let iter_loc f ctxt {txt; loc = _} = f ctxt txt
 let constant_string f s = pp f "%S" s
 
 let tyvar = Printast.tyvar
-let const_layout = Printast.const_layout
+let layout_annotation = Printast.layout_annotation 0
 
 let tyvar_layout_loc ~print_quote f (str,layout) =
   let pptv =
@@ -298,8 +298,7 @@ let tyvar_layout_loc ~print_quote f (str,layout) =
   in
   match layout with
   | None -> pptv f str.txt
-  | Some lay -> Format.fprintf f "(%a : %a)"
-                  pptv str.txt const_layout lay.txt
+  | Some lay -> Format.fprintf f "(%a : %a)" pptv str.txt layout_annotation lay
 let string_quot f x = pp f "`%s" x
 
 let maybe_local_type pty ctxt f c =
@@ -335,14 +334,8 @@ and core_type ctxt f x =
     | Ptyp_arrow (l, ct1, ct2) ->
         pp f "@[<2>%a@;->@;%a@]" (* FIXME remove parens later *)
           (type_with_label ctxt) (l,ct1) (return_type ctxt) ct2
-    | Ptyp_alias (ct, s, None) ->
-        pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct tyvar (Option.get s)
-    | Ptyp_alias (ct, s, Some lay) ->
-        pp f "@[<2>%a@;as@;(%t :@ %a)@]"
-          (core_type1 ctxt) ct
-          (fun ppf ->
-             match s with None -> fprintf ppf "_" | Some s -> tyvar ppf s)
-          const_layout lay.txt
+    | Ptyp_alias (ct, s) ->
+        pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct tyvar s
     | Ptyp_poly ([], ct, []) ->
         core_type ctxt f ct
     | Ptyp_poly (sl, ct, lays) ->
@@ -366,7 +359,7 @@ and core_type1 ctxt f x =
     | Ptyp_any -> pp f "_";
     | Ptyp_var (s, None) -> tyvar f  s;
     | Ptyp_var (s, Some layout) ->
-        pp f "(%a@;:@;%a)" tyvar s const_layout layout.txt
+        pp f "(%a@;:@;%a)" tyvar s layout_annotation layout
     | Ptyp_tuple l ->  pp f "(%a)" (list (core_type1 ctxt) ~sep:"@;*@;") l
     | Ptyp_constr (li, l) ->
         pp f (* "%a%a@;" *) "%a%a"
@@ -440,13 +433,29 @@ and core_type1 ctxt f x =
     | Ptyp_extension e -> extension ctxt f e
     | _ -> paren true (core_type ctxt) f x
 
-and core_type1_jane_syntax _ctxt _attrs _f : Jane_syntax.Core_type.t -> _ =
-  function
-  | _ -> .
+and core_type_jane_syntax ctxt attrs f (x : Jane_syntax.Core_type.t) =
+  let filtered_attrs = filter_curry_attrs attrs in
+  if filtered_attrs <> [] then begin
+    pp f "((%a)%a)" (core_type_jane_syntax ctxt []) x
+      (attributes ctxt) filtered_attrs
+  end
+  else match x with
+  | Jtyp_layout (Ltyp_alias { aliased_type; name; layout }) ->
+    pp f "@[<2>%a@;as@;(%t :@ %a)@]"
+      (core_type1 ctxt) aliased_type
+      (fun ppf ->
+         match name with None -> fprintf ppf "_" | Some s -> tyvar ppf s)
+      layout_annotation layout
+  (* Uncomment next line when we add jane-syntax types that should be
+     handled in core_type1:
+     | _ -> pp f "@[<2>%a@]" (core_type1_jane_syntax ctxt attrs) x
+  *)
 
-and core_type_jane_syntax _ctxt _attrs _f : Jane_syntax.Core_type.t -> _ =
-  function
-  | _ -> .
+and core_type1_jane_syntax ctxt attrs f x =
+  if has_non_curry_attr attrs then core_type_jane_syntax ctxt attrs f x
+  else
+    match x with
+    | _ -> paren true (core_type_jane_syntax ctxt attrs) f x
 
 and return_type ctxt f x =
   if x.ptyp_attributes <> [] then maybe_local_type core_type1 ctxt f x

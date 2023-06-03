@@ -898,6 +898,15 @@ let class_type_field sub ctf =
 let core_type sub ct =
   let loc = sub.location sub ct.ctyp_loc in
   let attrs = sub.attributes sub ct.ctyp_attributes in
+  let attrs = ref attrs in
+  (* Hack so we can return an extra value out of the [match] expression for Jane
+     Street internal expressions without needing to modify every case, which
+     would open us up to more merge conflicts.
+  *)
+  let add_jane_syntax_attributes { ptyp_attributes; ptyp_desc; _ } =
+    attrs := ptyp_attributes @ !attrs;
+    ptyp_desc
+  in
   let desc = match ct.ctyp_desc with
       Ttyp_any -> Ptyp_any
     | Ttyp_var (s, layout) ->
@@ -913,8 +922,14 @@ let core_type sub ct =
           (List.map (sub.object_field sub) list, o)
     | Ttyp_class (_path, lid, list) ->
         Ptyp_class (map_loc sub lid, List.map (sub.typ sub) list)
-    | Ttyp_alias (ct, s, lay) ->
-        Ptyp_alias (sub.typ sub ct, s, Option.map (fun l -> mkloc l loc) lay)
+    | Ttyp_alias (ct, Some s, None) ->
+        Ptyp_alias (sub.typ sub ct, s)
+    | Ttyp_alias (ct, s, Some layout) ->
+        Jane_syntax.Layouts.type_of ~loc ~attrs:[]
+          (Ltyp_alias { aliased_type = sub.typ sub ct; name = s;
+                        layout = mkloc layout loc }) |>
+        add_jane_syntax_attributes
+    | Ttyp_alias (_, None, None) -> assert false
     | Ttyp_variant (list, bool, labels) ->
         Ptyp_variant (List.map (sub.row_field sub) list, bool, labels)
     | Ttyp_poly (list, ct) ->
@@ -925,7 +940,7 @@ let core_type sub ct =
         Ptyp_poly (vars, sub.typ sub ct, layouts)
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
   in
-  Typ.mk ~loc ~attrs desc
+  Typ.mk ~loc ~attrs:!attrs desc
 
 let class_structure sub cs =
   let rec remove_self = function

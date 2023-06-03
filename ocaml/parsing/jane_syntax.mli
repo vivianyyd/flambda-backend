@@ -128,6 +128,18 @@ module Unboxed_constants : sig
     pattern -> Parsetree.pattern
 end
 
+(** The ASTs for layouts. *)
+module Layouts : sig
+  type nonrec core_type =
+    | Ltyp_alias of { aliased_type : Parsetree.core_type
+                    ; name : string option
+                    ; layout : Asttypes.layout_annotation }
+
+  val type_of :
+    loc:Location.t -> attrs:Parsetree.attributes ->
+    core_type -> Parsetree.core_type
+end
+
 (******************************************)
 (* General facility, which we export *)
 
@@ -206,7 +218,8 @@ end
 
 (** Novel syntax in types *)
 module Core_type : sig
-  type t = |
+  type t =
+    | Jtyp_layout of Layouts.core_type
 
   include AST
     with type t := t * Parsetree.attributes
@@ -285,3 +298,11 @@ module Extension_constructor : sig
   include AST with type t := t * Parsetree.attributes
                and type ast := Parsetree.extension_constructor
 end
+
+(*************************)
+(* Avoiding module loops *)
+
+val set_print_payload :
+  (Format.formatter -> Parsetree.payload -> unit) -> unit
+val set_print_core_type :
+  (Format.formatter -> Parsetree.core_type -> unit) -> unit

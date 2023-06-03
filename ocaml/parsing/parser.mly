@@ -542,6 +542,8 @@ let wrap_type_annotation ~loc newtypes core_type body =
   let vars, layouts = List.split newtypes in
   (exp, ghtyp(Ptyp_poly(vars, Typ.varify_constructors vars core_type, layouts)))
 
+
+
 let wrap_exp_attrs ~loc body (ext, attrs) =
   let ghexp = ghexp ~loc in
   (* todo: keep exact location for the entire attribute *)
@@ -3803,15 +3805,17 @@ alias_type:
       { $1 }
   | mktyp(
       ty = alias_type AS QUOTE tyvar = ident
-        { Ptyp_alias(ty, Some tyvar, None) }
-    | ty = alias_type AS
+        { Ptyp_alias(ty, tyvar) }
+   )
+   { $1 }
+  | aliased_type = alias_type AS
              LPAREN QUOTE tyvar = ident COLON layout = layout_annotation RPAREN
-        { Ptyp_alias(ty, Some tyvar, Some layout) }
-    | ty = alias_type AS
+      { (Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) ~attrs:[]
+           (Ltyp_alias { aliased_type; name = Some tyvar; layout })) }
+  | aliased_type = alias_type AS
              LPAREN UNDERSCORE COLON layout = layout_annotation RPAREN
-        { Ptyp_alias(ty, None, Some layout) }
-    )
-    { $1 }
+      { (Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) ~attrs:[]
+           (Ltyp_alias { aliased_type; name = None; layout })) }
 ;
 
 (* Function types include:

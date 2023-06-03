@@ -123,8 +123,10 @@ module T = struct
   let type_vars_layouts sub (tvls : type_vars_layouts) =
     List.iter (iter_opt (iter_loc2 sub sub.layout_annotation)) tvls
 
-  let iter_jst _sub : Jane_syntax.Core_type.t -> _ = function
-    | _ -> .
+  let iter_jst sub : Jane_syntax.Core_type.t -> _ = function
+    | Jtyp_layout (Ltyp_alias { aliased_type; name = _; layout }) ->
+      sub.typ sub aliased_type;
+      iter_loc2 sub sub.layout_annotation layout
 
   let iter sub ({ptyp_desc = desc; ptyp_loc = loc; ptyp_attributes = attrs}
                   as typ) =
@@ -148,9 +150,7 @@ module T = struct
         List.iter (object_field sub) ol
     | Ptyp_class (lid, tl) ->
         iter_loc sub lid; List.iter (sub.typ sub) tl
-    | Ptyp_alias (t, _, lay) ->
-        sub.typ sub t;
-        iter_opt (iter_loc2 sub sub.layout_annotation) lay
+    | Ptyp_alias (t, _) -> sub.typ sub t
     | Ptyp_variant (rl, _b, _ll) ->
         List.iter (row_field sub) rl
     | Ptyp_poly (_, t, lays) ->

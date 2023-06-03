@@ -488,7 +488,9 @@ and transl_type_aux env policy mode styp =
       ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes }
   in
   match Jane_syntax.Core_type.of_ast styp with
-  | Some (etyp, attrs) -> transl_type_aux_jst env policy mode attrs etyp
+  | Some (etyp, attrs) ->
+    let desc, typ = transl_type_aux_jst env policy mode attrs loc etyp in
+    ctyp desc typ
   | None ->
   match styp.ptyp_desc with
     Ptyp_any ->
@@ -698,79 +700,9 @@ and transl_type_aux env policy mode styp =
           assert false
       in
       ctyp (Ttyp_class (path, lid, args)) ty
-  | Ptyp_alias(st, alias, layout) ->
-    begin match alias with
-    | Some alias ->
-      let cty, layout_annot_opt =
-        try
-          let t = TyVarEnv.lookup_local alias in
-          let layout_annot_opt = match layout with
-          | None -> None
-          | Some annot ->
-            let layout =
-              Layout.of_annotation ~context:(Type_variable alias) annot
-            in
-            match constrain_type_layout env t layout with
-            | Ok _ -> Some annot.txt
-            | Error err ->
-              raise (Error(annot.loc, env, Bad_layout_annot(t, err)))
-          in
-          let ty = transl_type env policy mode st in
-          begin try unify_var env t ty.ctyp_type with Unify err ->
-            let err = Errortrace.swap_unification_error err in
-            raise(Error(styp.ptyp_loc, env, Alias_type_mismatch err))
-          end;
-          ty, layout_annot_opt
-        with Not_found ->
-          if !Clflags.principal then begin_def ();
-          let layout, layout_annot_opt =
-            match layout with
-            | None -> Layout.any ~why:Dummy_layout, None
-            | Some annot ->
-              Layout.of_annotation ~context:(Type_variable alias) annot,
-              Some annot.txt
-          in
-          let t = newvar layout in
-          TyVarEnv.remember_used alias t styp.ptyp_loc;
-          let ty = transl_type env policy mode st in
-          begin try unify_var env t ty.ctyp_type with Unify err ->
-             let err = Errortrace.swap_unification_error err in
-            raise(Error(styp.ptyp_loc, env, Alias_type_mismatch err))
-          end;
-          if !Clflags.principal then begin
-            end_def ();
-            generalize_structure t;
-          end;
-          let t = instance t in
-          let px = Btype.proxy t in
-          begin match get_desc px with
-          | Tvar { name = None; layout } ->
-             set_type_desc px (Tvar { name = Some alias; layout })
-          | Tunivar { name = None; layout } ->
-             set_type_desc px (Tunivar {name = Some alias; layout})
-          | _ -> ()
-          end;
-          { ty with ctyp_type = t }, layout_annot_opt
-      in
-      ctyp (Ttyp_alias (cty, Some alias, layout_annot_opt)) cty.ctyp_type
-    | None ->
-      let cty = transl_type env policy mode st in
-      let cty_expr = cty.ctyp_type in
-      let layout_annot = match layout with
-        | None -> assert false
-        | Some layout_annot -> layout_annot
-      in
-      let layout =
-          Layout.of_annotation ~context:(Type_variable "_") layout_annot
-      in
-      begin match constrain_type_layout env cty_expr layout with
-      | Ok () -> ()
-      | Error err ->
-        raise (Error(layout_annot.loc, env,
-                     Bad_layout_annot(cty_expr, err)))
-      end;
-      ctyp (Ttyp_alias (cty, None, Some layout_annot.txt)) cty_expr
-    end
+  | Ptyp_alias(st, alias) ->
+    let desc, typ = transl_alias env policy mode loc st (Some alias) None in
+    ctyp desc typ
   | Ptyp_variant(fields, closed, present) ->
       let name = ref None in
       let mkfield l f =
@@ -938,9 +870,84 @@ and transl_type_aux env policy mode styp =
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
-and transl_type_aux_jst _env _policy _mode _attrs
+and transl_type_aux_jst env policy mode _attrs loc
       : Jane_syntax.Core_type.t -> _ = function
-  | _ -> .
+  | Jtyp_layout (Ltyp_alias { aliased_type; name; layout }) ->
+    transl_alias env policy mode loc aliased_type name (Some layout)
+
+and transl_alias env policy mode alias_loc styp name_opt layout_annot_opt =
+  let cty = match name_opt with
+    | Some alias ->
+      begin try
+        let t = TyVarEnv.lookup_local alias in
+        let cty = transl_type env policy mode styp in
+        begin try unify_var env t cty.ctyp_type with Unify err ->
+          let err = Errortrace.swap_unification_error err in
+          raise(Error(alias_loc, env, Alias_type_mismatch err))
+        end;
+        begin match layout_annot_opt with
+        | None -> ()
+        | Some layout_annot ->
+          let layout =
+            Layout.of_annotation ~context:(Type_variable alias) layout_annot
+          in
+          begin match constrain_type_layout env t layout with
+          | Ok () -> ()
+          | Error err ->
+            raise (Error(layout_annot.loc, env, Bad_layout_annot(t, err)))
+          end
+        end;
+        cty
+      with Not_found ->
+        if !Clflags.principal then begin_def ();
+        let layout =
+          Layout.(of_annotation_option_default
+            ~default:(any ~why:Dummy_layout)
+            ~context:(Type_variable alias)
+            layout_annot_opt)
+        in
+        let t = newvar layout in
+        TyVarEnv.remember_used alias t alias_loc;
+        let cty = transl_type env policy mode styp in
+        begin try unify_var env t cty.ctyp_type with Unify err ->
+          let err = Errortrace.swap_unification_error err in
+          raise(Error(alias_loc, env, Alias_type_mismatch err))
+        end;
+        if !Clflags.principal then begin
+          end_def ();
+          generalize_structure t;
+        end;
+        let t = instance t in
+        let px = Btype.proxy t in
+        begin match get_desc px with
+        | Tvar { name = None; layout } ->
+           set_type_desc px (Tvar { name = Some alias; layout })
+        | Tunivar { name = None; layout } ->
+           set_type_desc px (Tunivar {name = Some alias; layout})
+        | _ -> ()
+        end;
+        { cty with ctyp_type = t }
+      end
+    | None ->
+      let cty = transl_type env policy mode styp in
+      let cty_expr = cty.ctyp_type in
+      let layout_annot = match layout_annot_opt with
+        | None -> assert false
+        | Some layout_annot -> layout_annot
+      in
+      let layout =
+          Layout.of_annotation ~context:(Type_variable "_") layout_annot
+      in
+      begin match constrain_type_layout env cty_expr layout with
+      | Ok () -> ()
+      | Error err ->
+        raise (Error(layout_annot.loc, env,
+                     Bad_layout_annot(cty_expr, err)))
+      end;
+      cty
+  in
+  Ttyp_alias (cty, name_opt, Option.map Location.get_txt layout_annot_opt),
+  cty.ctyp_type
 
 and transl_fields env policy o fields =
   let hfields = Hashtbl.create 17 in

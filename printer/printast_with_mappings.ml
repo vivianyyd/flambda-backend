@@ -203,10 +203,9 @@ let rec core_type i ppf x =
   | Ptyp_class (li, l) ->
       line i ppf "Ptyp_class %a\n" fmt_longident_loc li;
       list i core_type ppf l
-  | Ptyp_alias (ct, s, lay_opt) ->
-      line i ppf "Ptyp_alias \"%s\"\n" (Option.value s ~default:"_");
+  | Ptyp_alias (ct, s) ->
+      line i ppf "Ptyp_alias \"%s\"\n" s;
       core_type i ppf ct;
-      option i layout_annotation ppf lay_opt
   | Ptyp_poly (sl, ct, lays) ->
       line i ppf "Ptyp_poly%a\n"
         (fun ppf ->

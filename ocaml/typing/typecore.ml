@@ -3511,6 +3511,14 @@ let is_local_returning_function cases =
 
 (* Approximate the type of an expression, for better recursion *)
 
+(* CR layouts v2: This any is fine because we don't allow you to make types
+   that could be matched on and have anys in them.  But once we do, this
+   should probably be sort variable.  See Test 22 in typing-layouts/basics.ml
+   (which mentions approx_type) for why it can't be value.  *)
+(* CR layouts v2: RAE thinks this any is fine in perpetuity. Before changing
+   this, let's talk. *)
+let approx_type_default () = newvar (Layout.any ~why:Dummy_layout)
+
 let rec approx_type env sty =
   match Jane_syntax.Core_type.of_ast sty with
   | Some (jty, attrs) -> approx_type_jst env attrs jty
@@ -3553,14 +3561,10 @@ let rec approx_type env sty =
         let tyl = List.map (approx_type env) ctl in
         newconstr path tyl
       end
-  (* CR layouts v2: This any is fine because we don't allow you to make types
-     that could be matched on and have anys in them.  But once we do, this
-     should probably be sort variable.  See Test21 in typing-layouts/basics.ml
-     (which mentions approx_type) for why it can't be value.  *)
-  | _ -> newvar (Layout.any ~why:Dummy_layout)
+  | _ -> approx_type_default ()
 
 and approx_type_jst _env _attrs : Jane_syntax.Core_type.t -> _ = function
-  | _ -> .
+  | Jtyp_layout (Ltyp_alias _) -> approx_type_default ()
 
 let type_pattern_approx_jane_syntax : Jane_syntax.Pattern.t -> _ = function
   | Jpat_immutable_array _

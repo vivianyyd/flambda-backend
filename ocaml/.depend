@@ -299,16 +299,19 @@ parsing/ast_iterator.cmo : \
     parsing/parsetree.cmi \
     parsing/location.cmi \
     parsing/jane_syntax.cmi \
+    parsing/asttypes.cmi \
     parsing/ast_iterator.cmi
 parsing/ast_iterator.cmx : \
     parsing/parsetree.cmi \
     parsing/location.cmx \
     parsing/jane_syntax.cmx \
+    parsing/asttypes.cmi \
     parsing/ast_iterator.cmi
 parsing/ast_iterator.cmi : \
     parsing/parsetree.cmi \
     parsing/location.cmi \
-    parsing/jane_syntax.cmi
+    parsing/jane_syntax.cmi \
+    parsing/asttypes.cmi
 parsing/ast_mapper.cmo : \
     parsing/parsetree.cmi \
     utils/misc.cmi \
@@ -338,7 +341,8 @@ parsing/ast_mapper.cmx : \
 parsing/ast_mapper.cmi : \
     parsing/parsetree.cmi \
     parsing/location.cmi \
-    parsing/jane_syntax.cmi
+    parsing/jane_syntax.cmi \
+    parsing/asttypes.cmi
 parsing/asttypes.cmi : \
     parsing/location.cmi
 parsing/attr_helper.cmo : \
@@ -587,7 +591,8 @@ parsing/pprintast.cmx : \
     parsing/pprintast.cmi
 parsing/pprintast.cmi : \
     parsing/parsetree.cmi \
-    parsing/longident.cmi
+    parsing/longident.cmi \
+    parsing/asttypes.cmi
 parsing/printast.cmo : \
     parsing/parsetree.cmi \
     parsing/longident.cmi \

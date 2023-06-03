@@ -2,6 +2,89 @@ open Asttypes
 open Parsetree
 open Jane_syntax_parsing
 
+(*****************************************************)
+(* Printers, to avoid interdependency with Pprintast *)
+
+let print_payload : (Format.formatter -> payload -> unit) ref =
+  ref (fun _ _ -> assert false)
+let set_print_payload payload = print_payload := payload
+
+let print_core_type : (Format.formatter -> core_type -> unit) ref =
+  ref (fun _ _ -> assert false)
+let set_print_core_type core_type = print_core_type := core_type
+
+(****************************************)
+(* Helpers used just within this module *)
+
+module type Extension_string = sig
+  val feature : Feature.t
+  val extension_string : string
+end
+
+module Ast_of (AST : AST) (Ext : Extension_string) : sig
+  (* Wrap a bit of AST with a jane-syntax annotation *)
+  val wrap_jane_syntax :
+    string list ->   (* these strings describe the bit of new syntax *)
+    ?payload:payload ->
+    AST.ast ->
+    AST.ast
+end = struct
+  let wrap_jane_syntax suffixes ?payload to_be_wrapped =
+    AST.make_jane_syntax Ext.feature suffixes ?payload @@
+    to_be_wrapped
+end
+
+module Of_ast (Ext : Extension_string) : sig
+  (* Find and remove a jane-syntax attribute marker, throwing an exception
+     if the attribute name does not have the right format or extension. *)
+  val unwrap_jane_syntax_attributes :
+    loc:Location.t ->
+    attributes ->
+    string list * payload * attributes
+end = struct
+  module Desugaring_error = struct
+    type error =
+      | Not_this_embedding of Embedded_name.t
+      | Non_embedding
+
+    let report_error ~loc = function
+      | Not_this_embedding name ->
+          Location.errorf ~loc
+            "Tried to desugar the embedded term %a@ \
+             as belonging to the %s extension"
+            Embedded_name.pp_quoted_name name Ext.extension_string
+      | Non_embedding ->
+          Location.errorf ~loc
+            "Tried to desugar a non-embedded expression@ \
+             as belonging to the %s extension"
+            Ext.extension_string
+
+    exception Error of Location.t * error
+
+    let () =
+      Location.register_error_of_exn
+        (function
+          | Error(loc, err) ->
+            Some (report_error ~loc err)
+          | _ -> None)
+
+    let raise ~loc err =
+      raise (Error(loc, err))
+  end
+
+  let unwrap_jane_syntax_attributes ~loc attrs =
+    match find_and_remove_jane_syntax_attribute attrs with
+    | Some (ext_name, _loc, payload, attrs) -> begin
+        match Jane_syntax_parsing.Embedded_name.components ext_name with
+        | extension_occur :: names
+             when String.equal extension_occur Ext.extension_string ->
+           names, payload, attrs
+        | _ ->
+           Desugaring_error.raise ~loc (Not_this_embedding ext_name)
+      end
+    | None -> Desugaring_error.raise ~loc Non_embedding
+end
+
 (******************************************************************************)
 (** Individual language extension modules *)
 
@@ -43,8 +126,15 @@ open Jane_syntax_parsing
 
 (** List and array comprehensions *)
 module Comprehensions = struct
-  let feature : Feature.t = Language_extension Comprehensions
-  let extension_string = Feature.extension_component feature
+  module Ext = struct
+    let feature : Feature.t = Language_extension Comprehensions
+    let extension_string = Feature.extension_component feature
+  end
+
+  module Ast_of = Ast_of (Expression) (Ext)
+  module Of_ast = Of_ast (Ext)
+
+  include Ext
 
   type iterator =
     | Range of { start     : expression
@@ -92,7 +182,7 @@ module Comprehensions = struct
      v}
   *)
 
-  let comprehension_expr names x = Expression.make_jane_syntax feature names x
+  let comprehension_expr names x = Ast_of.wrap_jane_syntax names x
 
   (** First, we define how to go from the nice AST to the OCaml AST; this is
       the [expr_of_...] family of expressions, culminating in
@@ -162,21 +252,15 @@ module Comprehensions = struct
 
   module Desugaring_error = struct
     type error =
-      | Non_comprehension_embedding of Embedded_name.t
-      | Non_embedding
+      | Has_payload of payload
       | Bad_comprehension_embedding of string list
       | No_clauses
 
     let report_error ~loc = function
-      | Non_comprehension_embedding name ->
+      | Has_payload payload ->
           Location.errorf ~loc
-            "Tried to desugar the non-comprehension embedded term %a@ \
-             as part of a comprehension expression"
-            Embedded_name.pp_quoted_name name
-      | Non_embedding ->
-          Location.errorf ~loc
-            "Tried to desugar a non-embedded expression@ \
-             as part of a comprehension expression"
+            "Comprehensions attribute has an unexpected payload:@;%a"
+            (Printast.payload 0) payload
       | Bad_comprehension_embedding subparts ->
           Location.errorf ~loc
             "Unknown, unexpected, or malformed@ comprehension embedded term %a"
@@ -200,17 +284,12 @@ module Comprehensions = struct
   (* Returns the expression node with the outermost Jane Syntax-related
      attribute removed. *)
   let expand_comprehension_extension_expr expr =
-    match find_and_remove_jane_syntax_attribute expr.pexp_attributes with
-    | Some (ext_name, attributes) -> begin
-        match Jane_syntax_parsing.Embedded_name.components ext_name with
-        | comprehensions :: names
-          when String.equal comprehensions extension_string ->
-            names, { expr with pexp_attributes = attributes }
-        | _ :: _ ->
-            Desugaring_error.raise expr (Non_comprehension_embedding ext_name)
-      end
-    | None ->
-        Desugaring_error.raise expr Non_embedding
+    let names, payload, attributes =
+      Of_ast.unwrap_jane_syntax_attributes ~loc:expr.pexp_loc expr.pexp_attributes
+    in
+    match payload with
+    | PStr [] -> names, { expr with pexp_attributes = attributes }
+    | _ -> Desugaring_error.raise expr (Has_payload payload)
 
   let iterator_of_expr expr =
     match expand_comprehension_extension_expr expr with
@@ -413,6 +492,140 @@ module Unboxed_constants = struct
       Ast_helper.Pat.constant ~attrs constant)
 end
 
+(** Layouts *)
+module Layouts = struct
+  module Ext = struct
+    let feature : Feature.t = Language_extension Layouts
+    let extension_string = Feature.extension_component feature
+  end
+
+  module Ast_of = Ast_of (Core_type) (Ext)
+  module Of_ast = Of_ast (Ext)
+
+  include Ext
+
+  type nonrec core_type =
+    | Ltyp_alias of { aliased_type : core_type
+                    ; name : string option
+                    ; layout : Asttypes.layout_annotation }
+
+  (*******************************************************)
+  (* Errors *)
+
+  module Desugaring_error = struct
+    type error =
+      | Not_a_layout of Parsetree.payload
+      | Unexpected_wrapped_type of Parsetree.core_type
+      | Unexpected_attribute of string list
+
+    let report_error ~loc = function
+      | Not_a_layout typ ->
+          Location.errorf ~loc
+            "Layout attribute does not name a layout:@;%a"
+            (Printast.payload 0) typ
+      | Unexpected_wrapped_type typ ->
+          Location.errorf ~loc
+            "Layout alias is not an alias type:@;%a"
+            (Printast.core_type 0) typ
+      | Unexpected_attribute names ->
+          Location.errorf ~loc
+            "Layout extension does not understand these attribute names:@;[%a]"
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+               Format.pp_print_text) names
+
+    exception Error of Location.t * error
+
+    let () =
+      Location.register_error_of_exn
+        (function
+          | Error(loc, err) -> Some (report_error ~loc err)
+          | _ -> None)
+
+    let raise ~loc err = raise (Error(loc, err))
+  end
+
+  (*******************************************************)
+  (* Conversions with a payload *)
+
+  let encode_layout_as_payload layout =
+    (* CR layouts v1.5: revise when moving layout recognition away from parser*)
+    let layout_string = match layout.txt with
+      | Any -> "any"
+      | Value -> "value"
+      | Void -> "void"
+      | Immediate64 -> "immediate64"
+      | Immediate -> "immediate"
+    in
+    let expr =
+      Ast_helper.Exp.ident
+        (Location.mkloc (Longident.Lident layout_string) layout.loc)
+    in
+    PStr [ { pstr_desc = Pstr_eval (expr, []); pstr_loc = Location.none } ]
+
+  let decode_layout_from_payload ~loc payload = match payload with
+    | PStr [ { pstr_desc = Pstr_eval ({ pexp_desc = Pexp_ident layout_lid }, _);
+               _ } ] ->
+      (* CR layouts v1.5: revise when moving layout recognition away from parser*)
+      let layout = match Longident.last layout_lid.txt with
+        | "any" -> Any
+        | "value" -> Value
+        | "void" -> Void
+        | "immediate" -> Immediate
+        | "immediate64" -> Immediate64
+        | _ -> Desugaring_error.raise ~loc (Not_a_layout payload)
+      in
+      Location.mkloc layout layout_lid.loc
+    | _ -> Desugaring_error.raise ~loc (Not_a_layout payload)
+
+  (*******************************************************)
+  (* Encoding *)
+
+  let type_of ~loc ~attrs typ =
+    (* See Note [Wrapping with make_entire_jane_syntax] *)
+    Core_type.make_entire_jane_syntax ~loc feature begin fun () ->
+      match typ with
+      | Ltyp_alias { aliased_type; name; layout } ->
+        let payload = encode_layout_as_payload layout in
+        let has_name, inner_typ = match name with
+          | None -> "anon",
+                    { aliased_type with
+                      ptyp_attributes = aliased_type.ptyp_attributes @ attrs }
+          | Some name -> "named", Ast_helper.Typ.alias ~attrs aliased_type name
+        in
+        Ast_of.wrap_jane_syntax ["alias"; has_name] ~payload inner_typ
+    end
+
+  (*******************************************************)
+  (* Desugaring *)
+
+  let of_type typ =
+    let loc = typ.ptyp_loc in
+    let names, payload, attributes =
+      Of_ast.unwrap_jane_syntax_attributes ~loc typ.ptyp_attributes
+    in
+    let layout = decode_layout_from_payload ~loc payload in
+    let lty = match names with
+      | [ "alias"; "anon" ] ->
+        Ltyp_alias { aliased_type = { typ with ptyp_attributes = attributes }
+                   ; name = None
+                   ; layout }
+
+      | [ "alias"; "named" ] ->
+        begin match typ.ptyp_desc with
+        | Ptyp_alias (inner_typ, name) ->
+          Ltyp_alias { aliased_type = inner_typ
+                     ; name = Some name
+                     ; layout }
+
+      | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
+        end
+      | _ ->
+        Desugaring_error.raise ~loc (Unexpected_attribute names)
+    in
+    lty, attributes
+end
+
 (******************************************************************************)
 (** The interface to our novel syntax, which we export *)
 
@@ -424,9 +637,13 @@ module type AST = sig
 end
 
 module Core_type = struct
-  type t = |
+  type t =
+    | Jtyp_layout of Layouts.core_type
 
-  let of_ast_internal (feat : Feature.t) _typ = match feat with
+  let of_ast_internal (feat : Feature.t) typ = match feat with
+    | Language_extension Layouts ->
+      let typ, attrs = Layouts.of_type typ in
+      Some (Jtyp_layout typ, attrs)
     | _ -> None
 
   let of_ast = Core_type.make_of_ast ~of_ast_internal

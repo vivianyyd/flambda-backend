@@ -122,11 +122,7 @@ and core_type_desc =
             - [T #tconstr]             when [l=[T]],
             - [(T1, ..., Tn) #tconstr] when [l=[T1 ; ... ; Tn]].
          *)
-  | Ptyp_alias of core_type * string option * layout_annotation option
-      (** [T as 'a] or [T as ('a : immediate)] or [T as (_ : immediate)] *)
-      (* XXX layouts RAE: move the layout annotation to use the extensions
-         mechanism *)
-
+  | Ptyp_alias of core_type * string  (** [T as 'a]. *)
   | Ptyp_variant of row_field list * closed_flag * label list option
       (** [Ptyp_variant([`A;`B], flag, labels)] represents:
             - [[ `A|`B ]]

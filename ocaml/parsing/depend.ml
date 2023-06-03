@@ -95,6 +95,10 @@ let handle_extension ext =
   | _ ->
     ()
 
+(* CR layouts: Remember to add this when layouts can have module
+   prefixes. *)
+let add_layout _bv (_layout : Asttypes.layout_annotation) = ()
+
 let rec add_type bv ty =
   match Jane_syntax.Core_type.of_ast ty with
   | Some (jty, _attrs) -> add_type_jst bv jty
@@ -111,7 +115,7 @@ let rec add_type bv ty =
          | Otag (_, t) -> add_type bv t
          | Oinherit t -> add_type bv t) fl
   | Ptyp_class(c, tl) -> add bv c; List.iter (add_type bv) tl
-  | Ptyp_alias(t, _, _) -> add_type bv t
+  | Ptyp_alias(t, _) -> add_type bv t
   | Ptyp_variant(fl, _, _) ->
       List.iter
         (fun {prf_desc; _} -> match prf_desc with
@@ -122,8 +126,10 @@ let rec add_type bv ty =
   | Ptyp_package pt -> add_package_type bv pt
   | Ptyp_extension e -> handle_extension e
 
-and add_type_jst _bv : Jane_syntax.Core_type.t -> _ = function
-  | _ -> .
+and add_type_jst bv : Jane_syntax.Core_type.t -> _ = function
+  | Jtyp_layout (Ltyp_alias { aliased_type; name = _; layout }) ->
+    add_type bv aliased_type;
+    add_layout bv layout
 
 and add_package_type bv (lid, l) =
   add bv lid;

@@ -67,7 +67,7 @@ module Typ = struct
   let constr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_constr (a, b))
   let object_ ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_object (a, b))
   let class_ ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_class (a, b))
-  let alias ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_alias (a, b, c))
+  let alias ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_alias (a, b))
   let variant ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_variant (a, b, c))
   let poly ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_poly (a, b, c))
   let package ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_package (a, b))
@@ -108,9 +108,11 @@ module Typ = struct
             Ptyp_object (List.map loop_object_field lst, o)
         | Ptyp_class (longident, lst) ->
             Ptyp_class (longident, List.map loop lst)
-        | Ptyp_alias(core_type, string_opt, layout) ->
-            Option.iter (check_variable var_names t.ptyp_loc) string_opt;
-            Ptyp_alias(loop core_type, string_opt, layout)
+        (* A Ptyp_alias might be a layout annotation, but the code here
+           still has the correct behavior. *)
+        | Ptyp_alias(core_type, string) ->
+            check_variable var_names t.ptyp_loc string;
+            Ptyp_alias(loop core_type, string)
         | Ptyp_variant(row_field_list, flag, lbl_lst_option) ->
             Ptyp_variant(List.map loop_row_field row_field_list,
                          flag, lbl_lst_option)

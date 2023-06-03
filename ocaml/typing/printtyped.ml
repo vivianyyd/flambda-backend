@@ -163,9 +163,9 @@ let typevar_layout ~print_quote ppf (v, l) =
   in
   match l with
   | None -> fprintf ppf " %a" pptv v
-  | Some lay -> fprintf ppf " (%a : %a)"
+  | Some lay -> fprintf ppf " (%a : %s)"
                     pptv v
-                    Printast.const_layout lay
+                    (Printast.const_layout_to_string lay)
 
 let typevars ppf vs =
   List.iter (typevar_layout ~print_quote:true ppf) vs

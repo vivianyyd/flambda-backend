@@ -154,6 +154,7 @@ module type AST = sig
   val make_jane_syntax
     :  Feature.t
     -> string list
+    -> ?payload:Parsetree.payload
     -> ast
     -> ast
 
@@ -238,15 +239,17 @@ val assert_extension_enabled :
 *)
 (** Extracts the first attribute (in list order) that was inserted by the
     Jane Syntax framework, and returns the rest of the attributes in the
-    same relative order as was input.
+    same relative order as was input, along with the location of the removed
+    attribute and its payload.
 
     This can be used by [Jane_syntax] to peel off individual attributes in
     order to process a Jane Syntax element that consists of multiple
     nested ASTs.
 *)
-val find_and_remove_jane_syntax_attribute
-  :  Parsetree.attributes
-  -> (Embedded_name.t * Parsetree.attributes) option
+val find_and_remove_jane_syntax_attribute :
+  Parsetree.attributes ->
+  (Embedded_name.t * Location.t *
+   Parsetree.payload * Parsetree.attributes) option
 
 (** Errors around the representation of our extended ASTs.  These should mostly
     just be fatal, but they're needed for one test case

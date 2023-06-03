@@ -290,7 +290,10 @@ let is_float env ty =
 let is_fixed_type sd =
   let rec has_row_var sty =
     match sty.ptyp_desc with
-      Ptyp_alias (sty, _, _) -> has_row_var sty
+      (* CR layouts upstreaming: The Ptyp_alias case also covers the case for a
+         layout annotation, conveniently. When upstreaming layouts, this
+         function will need a case for layout-annotation aliases. *)
+      Ptyp_alias (sty, _) -> has_row_var sty
     | Ptyp_class _
     | Ptyp_object (_, Open)
     | Ptyp_variant (_, Open, _)
@@ -1937,7 +1940,7 @@ let rec parse_native_repr_attributes env core_type ty rmode ~global_repr =
       parse_native_repr_attributes env ct2 t2 (prim_const_mode mret) ~global_repr
     in
     ((mode,repr_arg) :: repr_args, repr_res)
-  | (Ptyp_poly (_, t, _) | Ptyp_alias (t, _, _)), _, _ ->
+  | (Ptyp_poly (_, t, _) | Ptyp_alias (t, _)), _, _ ->
      parse_native_repr_attributes env t ty rmode ~global_repr
   | _ ->
      let rmode =
