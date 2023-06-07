@@ -357,9 +357,7 @@ and core_type1 ctxt f x =
   else
     match x.ptyp_desc with
     | Ptyp_any -> pp f "_";
-    | Ptyp_var (s, None) -> tyvar f  s;
-    | Ptyp_var (s, Some layout) ->
-        pp f "(%a@;:@;%a)" tyvar s layout_annotation layout
+    | Ptyp_var s -> tyvar f  s;
     | Ptyp_tuple l ->  pp f "(%a)" (list (core_type1 ctxt) ~sep:"@;*@;") l
     | Ptyp_constr (li, l) ->
         pp f (* "%a%a@;" *) "%a%a"
@@ -446,15 +444,14 @@ and core_type_jane_syntax ctxt attrs f (x : Jane_syntax.Core_type.t) =
       (fun ppf ->
          match name with None -> fprintf ppf "_" | Some s -> tyvar ppf s)
       layout_annotation layout
-  (* Uncomment next line when we add jane-syntax types that should be
-     handled in core_type1:
-     | _ -> pp f "@[<2>%a@]" (core_type1_jane_syntax ctxt attrs) x
-  *)
+  | _ -> pp f "@[<2>%a@]" (core_type1_jane_syntax ctxt attrs) x
 
-and core_type1_jane_syntax ctxt attrs f x =
+and core_type1_jane_syntax ctxt attrs f (x : Jane_syntax.Core_type.t) =
   if has_non_curry_attr attrs then core_type_jane_syntax ctxt attrs f x
   else
     match x with
+    | Jtyp_layout (Ltyp_var { name; layout }) ->
+      pp f "(%a@;:@;%a)" tyvar name layout_annotation layout
     | _ -> paren true (core_type_jane_syntax ctxt attrs) f x
 
 and return_type ctxt f x =

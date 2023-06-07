@@ -127,9 +127,15 @@ let rec add_type bv ty =
   | Ptyp_extension e -> handle_extension e
 
 and add_type_jst bv : Jane_syntax.Core_type.t -> _ = function
-  | Jtyp_layout (Ltyp_alias { aliased_type; name = _; layout }) ->
+  | Jtyp_layout typ -> add_type_jst_layouts bv typ
+
+and add_type_jst_layouts bv : Jane_syntax.Layouts.core_type -> _ = function
+  | Ltyp_var { name = _; layout } ->
+    add_layout bv layout
+  | Ltyp_alias { aliased_type; name = _; layout } ->
     add_type bv aliased_type;
     add_layout bv layout
+
 
 and add_package_type bv (lid, l) =
   add bv lid;

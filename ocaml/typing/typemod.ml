@@ -503,25 +503,24 @@ let check_well_formed_module env loc context mty =
 let () = Env.check_well_formed_module := check_well_formed_module
 
 let type_decl_is_alias sdecl = (* assuming no explicit constraint *)
+  let eq_vars x y =
+    match Jane_syntax.Core_type.of_ast x, Jane_syntax.Core_type.of_ast y with
+    | Some (Jtyp_layout (Ltyp_var { name = nx; layout = lx }), _attrsx),
+      Some (Jtyp_layout (Ltyp_var { name = ny; layout = ly }), _attrsy) ->
+      String.equal nx ny &&
+      Location.compare_txt Layout.equal_const lx ly
+    | (Some _, _) | (_, Some _) -> false
+    | None, None ->
+    match x.ptyp_desc, y.ptyp_desc with
+    | Ptyp_var sx, Ptyp_var sy -> sx = sy
+    | _, _ -> false
+  in
   match sdecl.ptype_manifest with
   | Some {ptyp_desc = Ptyp_constr (lid, stl)}
        when List.length stl = List.length sdecl.ptype_params ->
-     begin
-       match
-         List.iter2 (fun x (y, _) ->
-             match x, y with
-               {ptyp_desc=Ptyp_var (sx,lx)}, {ptyp_desc=Ptyp_var (sy,ly)}
-                  when sx = sy &&
-                       Option.equal
-                         (Location.compare_txt Layout.equal_const)
-                         lx ly
-                  -> ()
-             | _, _ -> raise Exit)
-           stl sdecl.ptype_params;
-       with
-       | exception Exit -> None
-       | () -> Some lid
-     end
+    if List.for_all2 (fun x (y, _) -> eq_vars x y) stl sdecl.ptype_params
+    then Some lid
+    else None
   | _ -> None
 ;;
 

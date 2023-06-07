@@ -108,7 +108,7 @@ let get_unboxed_from_attributes sdecl =
    constraints *)
 let parameter_name sty = match sty.ptyp_desc with
   | Ptyp_any -> "_"
-  | Ptyp_var (name, _) -> "'" ^ name
+  | Ptyp_var name -> "'" ^ name
   | _ -> Misc.fatal_error
            "Type parameter was neither [Ptyp_any] nor [Ptyp_var _]"
 

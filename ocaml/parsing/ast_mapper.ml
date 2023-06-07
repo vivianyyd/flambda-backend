@@ -149,12 +149,20 @@ module T = struct
   let type_vars_layouts sub (tvls : type_vars_layouts) =
     List.map (map_opt (map_loc_txt sub sub.layout_annotation)) tvls
 
-  let map_jst sub : Jane_syntax.Core_type.t -> Jane_syntax.Core_type.t =
+  let map_jst_layouts sub :
+        Jane_syntax.Layouts.core_type -> Jane_syntax.Layouts.core_type =
     function
-    | Jtyp_layout (Ltyp_alias { aliased_type; name; layout }) ->
+    | Ltyp_var { name; layout } ->
+      let layout = map_loc_txt sub sub.layout_annotation layout in
+      Ltyp_var { name; layout }
+    | Ltyp_alias { aliased_type; name; layout } ->
       let aliased_type = sub.typ sub aliased_type in
       let layout = map_loc_txt sub sub.layout_annotation layout in
-      Jtyp_layout (Ltyp_alias { aliased_type; name; layout })
+      Ltyp_alias { aliased_type; name; layout }
+
+  let map_jst sub : Jane_syntax.Core_type.t -> Jane_syntax.Core_type.t =
+    function
+    | Jtyp_layout typ -> Jtyp_layout (map_jst_layouts sub typ)
 
   let map sub ({ptyp_desc = desc; ptyp_loc = loc; ptyp_attributes = attrs}
                  as typ) =
@@ -170,9 +178,7 @@ module T = struct
     let attrs = sub.attributes sub attrs in
     match desc with
     | Ptyp_any -> any ~loc ~attrs ()
-    | Ptyp_var (s, layout) ->
-        var ~loc ~attrs s
-          (map_opt (map_loc_txt sub sub.layout_annotation) layout)
+    | Ptyp_var s -> var ~loc ~attrs s
     | Ptyp_arrow (lab, t1, t2) ->
         arrow ~loc ~attrs lab (sub.typ sub t1) (sub.typ sub t2)
     | Ptyp_tuple tyl -> tuple ~loc ~attrs (List.map (sub.typ sub) tyl)

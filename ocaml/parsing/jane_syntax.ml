@@ -182,15 +182,13 @@ module Comprehensions = struct
      v}
   *)
 
-  let comprehension_expr names x = Ast_of.wrap_jane_syntax names x
-
   (** First, we define how to go from the nice AST to the OCaml AST; this is
       the [expr_of_...] family of expressions, culminating in
       [expr_of_comprehension_expr]. *)
 
   let expr_of_iterator = function
     | Range { start; stop; direction } ->
-        comprehension_expr
+        Ast_of.wrap_jane_syntax
           [ "for"
           ; "range"
           ; match direction with
@@ -198,20 +196,20 @@ module Comprehensions = struct
             | Downto -> "downto" ]
           (Ast_helper.Exp.tuple [start; stop])
     | In seq ->
-        comprehension_expr ["for"; "in"] seq
+        Ast_of.wrap_jane_syntax ["for"; "in"] seq
 
   let expr_of_clause_binding { pattern; iterator; attributes } =
     Ast_helper.Vb.mk ~attrs:attributes pattern (expr_of_iterator iterator)
 
   let expr_of_clause clause rest = match clause with
     | For iterators ->
-        comprehension_expr
+        Ast_of.wrap_jane_syntax
           ["for"]
           (Ast_helper.Exp.let_
              Nonrecursive (List.map expr_of_clause_binding iterators)
              rest)
     | When cond ->
-        comprehension_expr ["when"] (Ast_helper.Exp.sequence cond rest)
+        Ast_of.wrap_jane_syntax ["when"] (Ast_helper.Exp.sequence cond rest)
 
   let expr_of_comprehension ~type_ { body; clauses } =
     (* We elect to wrap the body in a new AST node (here, [Pexp_lazy])
@@ -221,13 +219,13 @@ module Comprehensions = struct
        part of its contract is threading through the user-written attributes
        on the outermost node.
     *)
-    comprehension_expr
+    Ast_of.wrap_jane_syntax
       type_
       (Ast_helper.Exp.lazy_
         (List.fold_right
           expr_of_clause
           clauses
-          (comprehension_expr ["body"] body)))
+          (Ast_of.wrap_jane_syntax ["body"] body)))
 
   let expr_of ~loc ~attrs cexpr =
     (* See Note [Wrapping with make_entire_jane_syntax] *)
@@ -505,6 +503,7 @@ module Layouts = struct
   include Ext
 
   type nonrec core_type =
+    | Ltyp_var of { name : string; layout : Asttypes.layout_annotation }
     | Ltyp_alias of { aliased_type : core_type
                     ; name : string option
                     ; layout : Asttypes.layout_annotation }
@@ -585,12 +584,16 @@ module Layouts = struct
     (* See Note [Wrapping with make_entire_jane_syntax] *)
     Core_type.make_entire_jane_syntax ~loc feature begin fun () ->
       match typ with
+      | Ltyp_var { name; layout } ->
+        let payload = encode_layout_as_payload layout in
+        Ast_of.wrap_jane_syntax ["var"] ~payload @@
+        Ast_helper.Typ.var ~loc ~attrs name
       | Ltyp_alias { aliased_type; name; layout } ->
         let payload = encode_layout_as_payload layout in
         let has_name, inner_typ = match name with
-          | None -> "anon",
-                    { aliased_type with
-                      ptyp_attributes = aliased_type.ptyp_attributes @ attrs }
+          | None -> "anon", { aliased_type with
+                              ptyp_attributes =
+                                aliased_type.ptyp_attributes @ attrs }
           | Some name -> "named", Ast_helper.Typ.alias ~attrs aliased_type name
         in
         Ast_of.wrap_jane_syntax ["alias"; has_name] ~payload inner_typ
@@ -606,6 +609,12 @@ module Layouts = struct
     in
     let layout = decode_layout_from_payload ~loc payload in
     let lty = match names with
+      | [ "var" ] ->
+         begin match typ.ptyp_desc with
+         | Ptyp_var name ->
+           Ltyp_var { name; layout }
+         | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
+         end
       | [ "alias"; "anon" ] ->
         Ltyp_alias { aliased_type = { typ with ptyp_attributes = attributes }
                    ; name = None
@@ -618,7 +627,7 @@ module Layouts = struct
                      ; name = Some name
                      ; layout }
 
-      | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
+        | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
         end
       | _ ->
         Desugaring_error.raise ~loc (Unexpected_attribute names)
