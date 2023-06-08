@@ -23,6 +23,7 @@ module Sort = struct
   type const =
     | Void
     | Value
+    | Float64
 
   type t =
     | Var of var
@@ -44,12 +45,14 @@ module Sort = struct
 
   let void = Const Void
   let value = Const Value
+  let float64 = Const Float64
 
   let some_value = Some value
 
   let of_const = function
     | Void -> void
     | Value -> value
+    | Float64 -> float64
 
   let of_var v = Var v
 
@@ -68,10 +71,12 @@ module Sort = struct
 
   let default_value : t option = Some (Const Value)
   let default_void : t option = Some (Const Void)
+  let default_float64 : t option = Some (Const Float64)
 
   let[@inline] default = function
     | Value -> default_value
     | Void -> default_void
+    | Float64 -> default_float64
 
   let rec get_default_value : t -> const = function
     | Const c -> c
@@ -102,9 +107,9 @@ module Sort = struct
 
   let equal_const_const c1 c2 = match c1, c2 with
     | Void, Void
-    | Value, Value -> Equal_no_mutation
-    | Void, Value
-    | Value, Void -> Unequal
+    | Value, Value
+    | Float64, Float64 -> Equal_no_mutation
+    | (Void | Value | Float64), _ -> Unequal
 
   let rec equate_var_const v1 c2 = match !v1 with
     | Some s1 -> equate_sort_const s1 c2
@@ -144,13 +149,14 @@ module Sort = struct
                | None -> v := some_value; false
                | Some s -> is_void_defaulting s
                end
-    | Const Value -> false
+    | Const (Value | Float64) -> false
 
   (*** pretty printing ***)
 
   let string_of_const = function
     | Value -> "value"
     | Void -> "void"
+    | Float64 -> "float64"
 
   let to_string s = match get s with
     | Var v -> var_name v
@@ -167,7 +173,8 @@ module Sort = struct
       | Var v   -> fprintf ppf "Var %a" var v
       | Const c -> fprintf ppf (match c with
                                 | Void  -> "Void"
-                                | Value -> "Value")
+                                | Value -> "Value"
+                                | Float64 -> "Float64")
 
     and opt_t ppf = function
       | Some s -> fprintf ppf "Some %a" t s
@@ -243,6 +250,9 @@ module Layout = struct
     | Gc_ignorable_check
     | Separability_check
 
+  type float64_creation_reason =
+    | Primitive of Ident.t
+
   type void_creation_reason =
     | V1_safety_check
 
@@ -265,6 +275,7 @@ module Layout = struct
     | Value_creation of value_creation_reason
     | Immediate_creation of immediate_creation_reason
     | Immediate64_creation of immediate64_creation_reason
+    | Float64_creation of float64_creation_reason
     | Void_creation of void_creation_reason
     | Any_creation of any_creation_reason
     | Concrete_creation of concrete_layout_reason
@@ -329,6 +340,8 @@ module Layout = struct
     fresh_layout Immediate64 ~why:(Immediate64_creation why)
   let immediate ~why =
     fresh_layout Immediate ~why:(Immediate_creation why)
+  let float64 ~why =
+    fresh_layout (Sort Sort.float64) ~why:(Float64_creation why)
 
   type const = Asttypes.const_layout =
     | Any
@@ -336,6 +349,7 @@ module Layout = struct
     | Void
     | Immediate64
     | Immediate
+    | Float64
 
   let string_of_const : const -> _ = function
     | Any -> "any"
@@ -343,6 +357,7 @@ module Layout = struct
     | Void -> "void"
     | Immediate64 -> "immediate64"
     | Immediate -> "immediate"
+    | Float64 -> "float64"
 
   let equal_const (c1 : const) (c2 : const) = match c1, c2 with
     | Any, Any -> true
@@ -350,7 +365,8 @@ module Layout = struct
     | Immediate, Immediate -> true
     | Void, Void -> true
     | Value, Value -> true
-    | (Any | Immediate64 | Immediate | Void | Value), _ -> false
+    | Float64, Float64 -> true
+    | (Any | Immediate64 | Immediate | Void | Value | Float64), _ -> false
 
   let sub_const (c1 : const) (c2 : const) = match c1, c2 with
     | Any, Any -> Equal
@@ -358,7 +374,7 @@ module Layout = struct
     | c1, c2 when equal_const c1 c2 -> Equal
     | (Immediate | Immediate64), Value -> Sub
     | Immediate, Immediate64 -> Sub
-    | (Any | Void | Value | Immediate64 | Immediate), _ -> Not_sub
+    | (Any | Void | Value | Immediate64 | Immediate | Float64), _ -> Not_sub
 
  (******************************)
   (* construction *)
@@ -375,6 +391,7 @@ module Layout = struct
     | Immediate64 -> fresh_layout Immediate64 ~why
     | Value -> fresh_layout (Sort Sort.value) ~why
     | Void -> fresh_layout (Sort Sort.void) ~why
+    | Float64 -> fresh_layout (Sort Sort.float64) ~why
 
   let of_attributes ~legacy_immediate ~reason attrs =
     match Builtin_attributes.layout ~legacy_immediate attrs with
@@ -424,6 +441,7 @@ module Layout = struct
          different constructors on the left than on the right *)
       | Const Void -> Const Void
       | Const Value -> Const Value
+      | Const Float64 -> Const Float64
       | Var v -> Var v
     end
 
@@ -435,6 +453,7 @@ module Layout = struct
       (* As above, this turns Sort.consts to Layout.consts *)
       | Value -> Value
       | Void -> Void
+      | Float64 -> Float64
     end
 
   let default_to_value t = ignore (get_default_value t)
@@ -446,6 +465,7 @@ module Layout = struct
   let sort_of_layout l =
     match get l with
     | Const Void -> Sort.void
+    | Const Float64 -> Sort.float64
     | Const (Value | Immediate | Immediate64) -> Sort.value
     | Const Any -> Misc.fatal_error "Layout.sort_of_layout"
     | Var v -> Sort.of_var v
@@ -609,6 +629,10 @@ module Layout = struct
       | Separability_check ->
          fprintf ppf "the check that a type is definitely not `float`"
 
+    let format_float64_creation_reason ppf = function
+      | Primitive id ->
+          fprintf ppf "it equals the primitive float64 type %s" (Ident.name id)
+
     let format_value_creation_reason ppf : value_creation_reason -> _ = function
       | Class_let_binding -> fprintf ppf "let-bound in a class expression"
       | Tuple_element -> fprintf ppf "a tuple element"
@@ -674,6 +698,8 @@ module Layout = struct
         format_void_creation_reason ppf void
       | Value_creation value ->
          format_value_creation_reason ppf value
+      | Float64_creation float64 ->
+          format_float64_creation_reason ppf float64
       | Concrete_creation concrete ->
          format_concrete_layout_reason ppf concrete
       | Imported ->
@@ -1018,6 +1044,9 @@ module Layout = struct
       | Gc_ignorable_check -> fprintf ppf "Gc_ignorable_check"
       | Separability_check -> fprintf ppf "Separability_check"
 
+    let float64_creation_reason ppf : float64_creation_reason -> _ = function
+      | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
+
     let value_creation_reason ppf : value_creation_reason -> _ = function
       | Class_let_binding -> fprintf ppf "Class_let_binding"
       | Tuple_element -> fprintf ppf "Tuple_element"
@@ -1067,6 +1096,8 @@ module Layout = struct
          fprintf ppf "Immediate_creation %a" immediate_creation_reason immediate
       | Immediate64_creation immediate64 ->
          fprintf ppf "Immediate64_creation %a" immediate64_creation_reason immediate64
+      | Float64_creation float64 ->
+          fprintf ppf "Float64_creation %a" float64_creation_reason float64
       | Value_creation value ->
          fprintf ppf "Value_creation %a" value_creation_reason value
       | Void_creation void ->

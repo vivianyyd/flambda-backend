@@ -57,6 +57,7 @@ type const_layout =
   | Void
   | Immediate64
   | Immediate
+  | Float64
 
 type label = string
 

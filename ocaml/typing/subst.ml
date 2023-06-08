@@ -78,6 +78,7 @@ let for_saving s =
   let value = Layout.of_const Value ~why:reason in
   let immediate = Layout.of_const Immediate ~why:reason in
   let immediate64 = Layout.of_const Immediate64 ~why:reason in
+  let float64 = Layout.of_const Float64 ~why:reason in
   let share_layout lay =
     match Layout.get lay with
     | Const Any -> any
@@ -85,6 +86,7 @@ let for_saving s =
     | Const Value -> value
     | Const Immediate -> immediate
     | Const Immediate64 -> immediate64
+    | Const Float64 -> float64
     | Var _ -> lay
   in
   { s with for_saving = Some share_layout; last_compose = None }

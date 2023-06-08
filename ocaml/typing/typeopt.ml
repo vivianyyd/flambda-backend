@@ -192,6 +192,7 @@ let value_kind_of_value_layout layout =
   match Layout.get_default_value layout with
   | Value -> Pgenval
   | Immediate -> Pintval
+  | Float64 -> Pfloatval (* CR nroberts: is this right? *)
   | Immediate64 ->
     if !Clflags.native_code && Sys.word_size = 64 then Pintval else Pgenval
   | Any | Void -> assert false
