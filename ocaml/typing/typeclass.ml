@@ -1606,9 +1606,13 @@ let class_infos define_class kind
   let ci_params =
     let make_param (sty, v) =
       try
-          (* CR layouts: That should probably allow [any], not just
-             [value] *)
-          (transl_type_param env sty (Layout.value ~why:Class_argument), v)
+        let param = transl_type_param ~generic:false env (Pident ty_id) sty in
+        (* CR layouts: we require class type parameters to be values, but
+           we should lift this restriction. Doing so causes bad error messages
+           today, so we wait for tomorrow. *)
+        Ctype.unify env param.ctyp_type
+          (Ctype.newvar (Layout.value ~why:Class_argument));
+        (param, v)
       with Already_bound ->
         raise(Error(sty.ptyp_loc, env, Repeated_parameter))
     in

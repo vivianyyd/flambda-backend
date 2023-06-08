@@ -1,5 +1,6 @@
 (* TEST
    * expect
+   flags = "-extension layouts"
 *)
 
 (* Tests for layouts in algebraic datatypes *)
@@ -72,5 +73,6 @@ type t6 = { fld6 : float; }
 Line 2, characters 11-20:
 2 | type ('a : immediate) s6 = S6 of 'a
                ^^^^^^^^^
-Error: Layout immediate is used here, but the appropriate layouts extension is not enabled
+Error: Layout immediate is more experimental than allowed by -extension layouts.
+       You must enable -extension layouts_beta to use this feature.
 |}]

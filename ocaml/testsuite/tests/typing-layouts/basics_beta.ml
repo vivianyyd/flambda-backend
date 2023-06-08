@@ -156,19 +156,15 @@ Error:
 type ('a : any) t4 = 'a
 and s4 = string t4;;
 [%%expect{|
-Line 1, characters 11-14:
-1 | type ('a : any) t4 = 'a
-               ^^^
-Error: Layout any is used here, but the appropriate layouts extension is not enabled
+type ('a : any) t4 = 'a
+and s4 = string t4
 |}];;
 
 type s4 = string t4
 and ('a : any) t4;;
 [%%expect{|
-Line 2, characters 10-13:
-2 | and ('a : any) t4;;
-              ^^^
-Error: Layout any is used here, but the appropriate layouts extension is not enabled
+type s4 = string t4
+and ('a : any) t4
 |}];;
 
 type ('a : void) void4 = Void4  of 'a;;
@@ -176,15 +172,13 @@ type ('a : void) void4 = Void4  of 'a;;
 Line 1, characters 11-15:
 1 | type ('a : void) void4 = Void4  of 'a;;
                ^^^^
-Error: Layout void is used here, but the appropriate layouts extension is not enabled
+Error: Layout void is more experimental than allowed by -extension layouts_beta.
+       You must enable -extension layouts_alpha to use this feature.
 |}];;
 
 type ('a : any) any4 = Any4 of 'a
 [%%expect{|
-Line 1, characters 11-14:
-1 | type ('a : any) any4 = Any4 of 'a
-               ^^^
-Error: Layout any is used here, but the appropriate layouts extension is not enabled
+type 'a any4 = Any4 of 'a
 |}];;
 
 (************************************************************)
@@ -358,7 +352,8 @@ end;;
 Line 2, characters 13-17:
 2 |   type ('a : void) t = { x : int; v : 'a }
                  ^^^^
-Error: Layout void is used here, but the appropriate layouts extension is not enabled
+Error: Layout void is more experimental than allowed by -extension layouts_beta.
+       You must enable -extension layouts_alpha to use this feature.
 |}]
 
 (*******************************************************************)

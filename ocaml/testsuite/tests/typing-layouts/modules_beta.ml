@@ -41,7 +41,8 @@ end;;
 Line 2, characters 13-17:
 2 |   type ('a : void) t
                  ^^^^
-Error: Layout void is used here, but the appropriate layouts extension is not enabled
+Error: Layout void is more experimental than allowed by -extension layouts_beta.
+       You must enable -extension layouts_alpha to use this feature.
 |}];;
 
 module type S1_2 = sig

@@ -255,7 +255,7 @@ module Layout = struct
 
   type annotation_context =
     | Type_declaration of Path.t
-    | Type_parameter of Path.t * string
+    | Type_parameter of Path.t * string option
     | With_constraint of string
     | Newtype_declaration of string
     | Constructor_type_parameter of Path.t * string
@@ -552,7 +552,10 @@ module Layout = struct
 
   (* This module is just to keep all the helper functions more locally
      scoped. *)
-  module Format_history = struct
+  module Format_history : sig
+    val format_history :
+      intro:(Format.formatter -> unit) -> Format.formatter -> t -> unit
+  end = struct
     (* CR layouts: all the output in this section is subject to change;
        actually look closely at error messages once this is activated *)
 
@@ -589,8 +592,9 @@ module Layout = struct
           fprintf ppf "the declaration of the type %a"
             !printtyp_path p
       | Type_parameter (path, var) ->
+          let var_string = match var with None -> "_" | Some v -> "'" ^ v in
           fprintf ppf "@[%s@ in the declaration of the type@ %a@]"
-            var
+            var_string
             !printtyp_path path
       | With_constraint s ->
           fprintf ppf "the `with` constraint for %s" s
@@ -1031,7 +1035,9 @@ module Layout = struct
       | Type_declaration p ->
           fprintf ppf "Type_declaration %a" Path.print p
       | Type_parameter (p, var) ->
-          fprintf ppf "Type_parameter (%a, %S)" Path.print p var
+          fprintf ppf "Type_parameter (%a, %a)"
+            Path.print p
+            (Misc.Stdlib.Option.print Misc.Stdlib.String.print) var
       | With_constraint s ->
           fprintf ppf "With_constraint %S" s
       | Newtype_declaration name ->
@@ -1176,10 +1182,11 @@ module Layout = struct
         hint
     | Some cmd_line_string ->
       Location.errorf ~loc
-        "@[<v>Using a %s as the layout of a %a@;\
-         is more experimental than allowed by -extension %s.@;%t@]"
+        (* CR layouts errors: use the context to produce a better error message.
+           When RAE tried this, some types got printed like [t/2], but the
+           [/2] shouldn't be there. Investigate and fix. *)
+        "@[<v>Layout %s is more experimental than allowed by -extension %s.@;%t@]"
         (string_of_const layout)
-        Format_history.format_annotation_context context
         cmd_line_string
         hint
 

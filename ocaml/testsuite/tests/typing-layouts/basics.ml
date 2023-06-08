@@ -1,5 +1,6 @@
 (* TEST
    * expect
+   flags = "-extension layouts"
 *)
 type t_value : value
 type t_imm   : immediate
@@ -58,7 +59,8 @@ type ('a : immediate) imm_id = 'a;;
 Line 1, characters 11-20:
 1 | type ('a : immediate) imm_id = 'a;;
                ^^^^^^^^^
-Error: Layout immediate is used here, but the appropriate layouts extension is not enabled
+Error: Layout immediate is more experimental than allowed by -extension layouts.
+       You must enable -extension layouts_beta to use this feature.
 |}];;
 
 (************************************)
@@ -121,7 +123,8 @@ end;;
 Line 4, characters 13-22:
 4 |   type ('a : immediate) t = 'a
                  ^^^^^^^^^
-Error: Layout immediate is used here, but the appropriate layouts extension is not enabled
+Error: Layout immediate is more experimental than allowed by -extension layouts.
+       You must enable -extension layouts_beta to use this feature.
 |}]
 
 (**************************************************************)
@@ -139,7 +142,8 @@ end;;
 Line 2, characters 13-17:
 2 |   type ('a : void) t = { x : int; v : 'a }
                  ^^^^
-Error: Layout void is used here, but the appropriate layouts extension is not enabled
+Error: Layout void is more experimental than allowed by -extension layouts.
+       You must enable -extension layouts_alpha to use this feature.
 |}]
 
 (*******************************************************************)

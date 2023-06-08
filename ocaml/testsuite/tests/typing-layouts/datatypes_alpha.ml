@@ -77,8 +77,9 @@ Line 2, characters 0-29:
 2 | and 'b t1_constraint' = t_any
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       'a t1_constraint' has layout any, which is not representable.
+       'b t1_constraint' has layout any, which is not representable.
 |}]
+(* CR layouts errors: this error is blamed on the wrong piece *)
 
 (******************************************************)
 (* Test 3: void allowed in records, but not by itself *)

@@ -1,5 +1,6 @@
 (* TEST
    * expect
+   flags = "-extension layouts"
 *)
 
 type t_value : value
@@ -41,7 +42,8 @@ end;;
 Line 2, characters 13-17:
 2 |   type ('a : void) t
                  ^^^^
-Error: Layout void is used here, but the appropriate layouts extension is not enabled
+Error: Layout void is more experimental than allowed by -extension layouts.
+       You must enable -extension layouts_alpha to use this feature.
 |}];;
 
 (* CR layouts: parts of this test moved to [modules_beta.ml] because they need
@@ -54,7 +56,8 @@ end;;
 Line 2, characters 13-22:
 2 |   type ('a : immediate) t
                  ^^^^^^^^^
-Error: Layout immediate is used here, but the appropriate layouts extension is not enabled
+Error: Layout immediate is more experimental than allowed by -extension layouts.
+       You must enable -extension layouts_beta to use this feature.
 |}];;
 
 (************************************************************************)
@@ -71,7 +74,8 @@ end;;
 Line 2, characters 13-22:
 2 |   type ('a : immediate) t
                  ^^^^^^^^^
-Error: Layout immediate is used here, but the appropriate layouts extension is not enabled
+Error: Layout immediate is more experimental than allowed by -extension layouts.
+       You must enable -extension layouts_beta to use this feature.
 |}];;
 
 (******************************************************************)

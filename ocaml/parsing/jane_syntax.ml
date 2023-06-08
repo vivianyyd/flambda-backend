@@ -21,7 +21,8 @@ module type Extension_string = sig
   val extension_string : string
 end
 
-module Ast_of (AST : AST) (Ext : Extension_string) : sig
+module Ast_of (AST : AST)
+              (Ext : Extension_string) : sig
   (* Wrap a bit of AST with a jane-syntax annotation *)
   val wrap_jane_syntax :
     string list ->   (* these strings describe the bit of new syntax *)
