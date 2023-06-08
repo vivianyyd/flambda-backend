@@ -3956,8 +3956,11 @@ atomic_type:
   )
   { $1 } /* end mktyp group */
   | LPAREN QUOTE name=ident COLON layout=layout_annotation RPAREN
-    { Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) ~attrs:[] @@
-      Ltyp_var { name; layout } }
+      { Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) ~attrs:[] @@
+        Ltyp_var { name = Some name; layout } }
+  | LPAREN UNDERSCORE COLON layout=layout_annotation RPAREN
+      { Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) ~attrs:[] @@
+        Ltyp_var { name = None; layout } }
 
 
 (* This is the syntax of the actual type parameters in an application of

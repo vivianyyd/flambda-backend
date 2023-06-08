@@ -131,7 +131,11 @@ end
 (** The ASTs for layouts. *)
 module Layouts : sig
   type nonrec core_type =
-    | Ltyp_var of { name : string; layout : Asttypes.layout_annotation }
+    (* ['a : immediate] or [_ : float64] *)
+    | Ltyp_var of { name : string option
+                  ; layout : Asttypes.layout_annotation }
+
+    (* [ty as ('a : immediate)] *)
     | Ltyp_alias of { aliased_type : Parsetree.core_type
                     ; name : string option
                     ; layout : Asttypes.layout_annotation }
