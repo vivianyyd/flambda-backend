@@ -30,8 +30,7 @@ module Ast_of (AST : AST) (Ext : Extension_string) : sig
     AST.ast
 end = struct
   let wrap_jane_syntax suffixes ?payload to_be_wrapped =
-    AST.make_jane_syntax Ext.feature suffixes ?payload @@
-    to_be_wrapped
+    AST.make_jane_syntax Ext.feature suffixes ?payload to_be_wrapped
 end
 
 module Of_ast (Ext : Extension_string) : sig

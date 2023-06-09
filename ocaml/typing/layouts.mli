@@ -268,9 +268,10 @@ module Layout : sig
   val of_const : why:creation_reason -> const -> t
 
   val of_annotation :
-    context:annotation_context -> Asttypes.layout_annotation -> t
+    ?skip_check:bool -> context:annotation_context -> Asttypes.layout_annotation -> t
 
   val of_annotation_option_default :
+    ?skip_check:bool ->
     default:t -> context:annotation_context ->
     Asttypes.layout_annotation option -> t
 

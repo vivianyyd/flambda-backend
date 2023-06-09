@@ -181,7 +181,6 @@ type sort = Sort.t
 
 module Layout = struct
   (*** reasons for layouts **)
-
   type concrete_layout_reason =
     | Match
     | Constructor_declaration of int
@@ -365,7 +364,25 @@ module Layout = struct
     | Immediate, Immediate64 -> Sub
     | (Any | Void | Value | Immediate64 | Immediate), _ -> Not_sub
 
- (******************************)
+  (******************************)
+  (*** user errors ***)
+  type error =
+    | Insufficient_level of annotation_context * Asttypes.const_layout
+
+  exception User_error of Location.t * error
+
+  let raise ~loc err = raise (User_error(loc, err))
+
+  (*** extension requirements ***)
+  let get_required_layouts_level
+        (context : annotation_context) (layout : const) :
+        Language_extension.maturity =
+    match context, layout with
+    | _, Value -> Stable
+    | _, (Immediate | Immediate64 | Any) -> Beta
+    | _, Void -> Alpha
+
+  (******************************)
   (* construction *)
 
   let of_new_sort_var ~why =
@@ -381,21 +398,28 @@ module Layout = struct
     | Value -> fresh_layout (Sort Sort.value) ~why
     | Void -> fresh_layout (Sort Sort.void) ~why
 
-  let of_annotation ~context Location.{ loc; txt = const } =
+  let of_annotation ?(skip_check=false) ~context Location.{ loc; txt = const } =
+    begin
+      if not skip_check
+      then let required_layouts_level = get_required_layouts_level context const in
+           if not (Language_extension.is_at_least Layouts required_layouts_level)
+           then raise ~loc (Insufficient_level (context, const))
+    end;
     of_const ~why:(Annotated (context, loc)) const
 
-  let of_annotation_option ~context = Option.map (of_annotation ~context)
+  let of_annotation_option ?skip_check ~context =
+    Option.map (of_annotation ?skip_check ~context)
 
-  let of_annotation_option_default ~default ~context =
-    Option.fold ~none:default ~some:(of_annotation ~context)
+  let of_annotation_option_default ?skip_check ~default ~context =
+    Option.fold ~none:default ~some:(of_annotation ?skip_check ~context)
 
   let of_attributes ~legacy_immediate ~context attrs =
     Builtin_attributes.layout ~legacy_immediate attrs |>
-    Result.map (of_annotation_option ~context)
+    Result.map (of_annotation_option ~skip_check:legacy_immediate ~context)
 
   let of_attributes_default ~legacy_immediate ~context ~default attrs =
     Builtin_attributes.layout ~legacy_immediate attrs |>
-    Result.map (of_annotation_option_default ~default ~context)
+    Result.map (of_annotation_option_default ~skip_check:legacy_immediate ~default ~context)
 
   let for_boxed_record ~all_void =
     if all_void then immediate ~why:Empty_record else value ~why:Boxed_record
@@ -528,10 +552,7 @@ module Layout = struct
 
   (* This module is just to keep all the helper functions more locally
      scoped. *)
-  module Format_history : sig
-    val format_history :
-      intro:(Format.formatter -> unit) -> Format.formatter -> t -> unit
-  end = struct
+  module Format_history = struct
     (* CR layouts: all the output in this section is subject to change;
        actually look closely at error messages once this is activated *)
 
@@ -1138,6 +1159,36 @@ module Layout = struct
         internal layout
         history h
   end
+
+  (*** formatting user errors ***)
+  let report_error ~loc = function
+  | Insufficient_level (context, layout) ->
+    let required_layouts_level = get_required_layouts_level context layout in
+    let hint ppf =
+      Format.fprintf ppf "You must enable -extension %s to use this feature."
+        (Language_extension.to_command_line_string
+           Layouts required_layouts_level)
+    in
+    match Language_extension.get_enabled_command_line_string Layouts with
+    | None ->
+      Location.errorf ~loc
+        "@[<v>The appropriate layouts extension is not enabled.@;%t@]"
+        hint
+    | Some cmd_line_string ->
+      Location.errorf ~loc
+        "@[<v>Using a %s as the layout of a %a@;\
+         is more experimental than allowed by -extension %s.@;%t@]"
+        (string_of_const layout)
+        Format_history.format_annotation_context context
+        cmd_line_string
+        hint
+
+  let () =
+    Location.register_error_of_exn
+      (function
+        | User_error(loc, err) ->
+          Some (report_error ~loc err)
+        | _ -> None)
 end
 
 type layout = Layout.t
