@@ -3565,6 +3565,7 @@ let rec approx_type env sty =
 
 and approx_type_jst _env _attrs : Jane_syntax.Core_type.t -> _ = function
   | Jtyp_layout (Ltyp_var _) -> approx_type_default ()
+  | Jtyp_layout (Ltyp_poly _) -> approx_type_default ()
   | Jtyp_layout (Ltyp_alias _) -> approx_type_default ()
 
 let type_pattern_approx_jane_syntax : Jane_syntax.Pattern.t -> _ = function

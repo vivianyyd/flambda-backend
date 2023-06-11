@@ -13,6 +13,12 @@ let print_core_type : (Format.formatter -> core_type -> unit) ref =
   ref (fun _ _ -> assert false)
 let set_print_core_type core_type = print_core_type := core_type
 
+let print_layout_annotation :
+  (Format.formatter -> layout_annotation -> unit) ref =
+  ref (fun _ _ -> assert false)
+let set_print_layout_annotation layout_annotation =
+  print_layout_annotation := layout_annotation
+
 (****************************************)
 (* Helpers used just within this module *)
 
@@ -505,6 +511,8 @@ module Layouts = struct
   type nonrec core_type =
     | Ltyp_var of { name : string option
                   ; layout : Asttypes.layout_annotation }
+    | Ltyp_poly of { bound_vars : (string loc * layout_annotation option) list
+                   ; inner_type : core_type }
     | Ltyp_alias of { aliased_type : core_type
                     ; name : string option
                     ; layout : Asttypes.layout_annotation }
@@ -517,12 +525,13 @@ module Layouts = struct
       | Not_a_layout of Parsetree.payload
       | Unexpected_wrapped_type of Parsetree.core_type
       | Unexpected_attribute of string list
+      | Wrong_number_of_layouts of int * layout_annotation option list
 
     let report_error ~loc = function
-      | Not_a_layout typ ->
+      | Not_a_layout payload ->
           Location.errorf ~loc
             "Layout attribute does not name a layout:@;%a"
-            (Printast.payload 0) typ
+            (Printast.payload 0) payload
       | Unexpected_wrapped_type typ ->
           Location.errorf ~loc
             "Layout alias is not an alias type:@;%a"
@@ -533,6 +542,16 @@ module Layouts = struct
             (Format.pp_print_list
                ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
                Format.pp_print_text) names
+      | Wrong_number_of_layouts (n, layouts) ->
+          Location.errorf ~loc
+            "Wrong number of layouts in an layout attribute;@;\
+             expecting %i but got this list:@;%a"
+            n
+            (Format.pp_print_list
+               (Format.pp_print_option
+                  ~none:(fun ppf () -> Format.fprintf ppf "None")
+                  !print_layout_annotation))
+            layouts
 
     exception Error of Location.t * error
 
@@ -548,60 +567,133 @@ module Layouts = struct
   (*******************************************************)
   (* Conversions with a payload *)
 
-  let encode_layout_as_payload layout =
-    (* CR layouts v1.5: revise when moving layout recognition away from parser*)
-    let layout_string = match layout.txt with
-      | Any -> "any"
-      | Value -> "value"
-      | Void -> "void"
-      | Immediate64 -> "immediate64"
-      | Immediate -> "immediate"
-    in
-    let expr =
+  module Encode : sig
+    val as_payload : layout_annotation -> payload
+    val option_list_as_payload : layout_annotation option list -> payload
+  end = struct
+    let as_expr layout =
+      (* CR layouts v1.5: revise when moving layout recognition away from parser*)
+      let layout_string = match layout.txt with
+        | Any -> "any"
+        | Value -> "value"
+        | Void -> "void"
+        | Immediate64 -> "immediate64"
+        | Immediate -> "immediate"
+      in
       Ast_helper.Exp.ident
         (Location.mkloc (Longident.Lident layout_string) layout.loc)
-    in
-    PStr [ { pstr_desc = Pstr_eval (expr, []); pstr_loc = Location.none } ]
 
-  let decode_layout_from_payload ~loc payload = match payload with
-    | PStr [ { pstr_desc = Pstr_eval ({ pexp_desc = Pexp_ident layout_lid }, _);
-               _ } ] ->
-      (* CR layouts v1.5: revise when moving layout recognition away from parser*)
-      let layout = match Longident.last layout_lid.txt with
-        | "any" -> Any
-        | "value" -> Value
-        | "void" -> Void
-        | "immediate" -> Immediate
-        | "immediate64" -> Immediate64
-        | _ -> Desugaring_error.raise ~loc (Not_a_layout payload)
+    let structure_item_of_expr expr =
+      { pstr_desc = Pstr_eval (expr, []); pstr_loc = Location.none }
+
+    let structure_item_of_none =
+      { pstr_desc = Pstr_attribute { attr_name = Location.mknoloc "none"
+                                   ; attr_payload = PStr []
+                                   ; attr_loc = Location.none }
+      ; pstr_loc = Location.none }
+
+    let as_payload layout =
+      let expr = as_expr layout in
+      PStr [ structure_item_of_expr expr ]
+
+    let option_list_as_payload layouts =
+      let items =
+        List.map (function
+          | None -> structure_item_of_none
+          | Some layout -> structure_item_of_expr (as_expr layout))
+          layouts
       in
-      Location.mkloc layout layout_lid.loc
-    | _ -> Desugaring_error.raise ~loc (Not_a_layout payload)
+      PStr items
+  end
+
+  module Decode : sig
+    val from_payload : loc:Location.t -> payload -> layout_annotation
+    val option_list_from_payload :
+      loc:Location.t -> payload -> layout_annotation option list
+  end = struct
+    exception Unexpected
+
+    let from_expr = function
+      | { pexp_desc = Pexp_ident layout_lid; _ } ->
+        (* CR layouts v1.5: revise when moving layout recognition away from parser*)
+        let layout = match Longident.last layout_lid.txt with
+          | "any" -> Any
+          | "value" -> Value
+          | "void" -> Void
+          | "immediate" -> Immediate
+          | "immediate64" -> Immediate64
+          | _ -> raise Unexpected
+        in
+        Location.mkloc layout layout_lid.loc
+      | _ -> raise Unexpected
+
+    let expr_of_structure_item = function
+      | { pstr_desc = Pstr_eval (expr, _) } -> expr
+      | _ -> raise Unexpected
+
+    let is_none_structure_item = function
+      | { pstr_desc = Pstr_attribute { attr_name = { txt = "none" } } } -> true
+      | _ -> false
+
+    let from_payload ~loc payload =
+      try
+        match payload with
+        | PStr [ item ] -> from_expr (expr_of_structure_item item)
+        | _ -> raise Unexpected
+      with
+        Unexpected -> Desugaring_error.raise ~loc (Not_a_layout payload)
+
+    let option_list_from_payload ~loc payload =
+      try
+        match payload with
+        | PStr items ->
+          List.map (fun item ->
+            if is_none_structure_item item
+            then None
+            else Some (from_expr (expr_of_structure_item item)))
+            items
+        | _ -> raise Unexpected
+      with
+        Unexpected -> Desugaring_error.raise ~loc (Not_a_layout payload)
+  end
 
   (*******************************************************)
   (* Encoding *)
 
   let type_of ~loc ~attrs typ =
-    (* See Note [Wrapping with make_entire_jane_syntax] *)
-    Core_type.make_entire_jane_syntax ~loc feature begin fun () ->
-      match typ with
-      | Ltyp_var { name; layout } ->
-        let payload = encode_layout_as_payload layout in
-        Ast_of.wrap_jane_syntax ["var"] ~payload @@
-        begin match name with
-        | None -> Ast_helper.Typ.any ~loc ~attrs ()
-        | Some name -> Ast_helper.Typ.var ~loc ~attrs name
-        end
-      | Ltyp_alias { aliased_type; name; layout } ->
-        let payload = encode_layout_as_payload layout in
-        let has_name, inner_typ = match name with
-          | None -> "anon", { aliased_type with
-                              ptyp_attributes =
-                                aliased_type.ptyp_attributes @ attrs }
-          | Some name -> "named", Ast_helper.Typ.alias ~attrs aliased_type name
-        in
-        Ast_of.wrap_jane_syntax ["alias"; has_name] ~payload inner_typ
-    end
+    let exception No_wrap_necessary of Parsetree.core_type in
+    try
+      (* See Note [Wrapping with make_entire_jane_syntax] *)
+      Core_type.make_entire_jane_syntax ~loc feature begin fun () ->
+        match typ with
+        | Ltyp_var { name; layout } ->
+          let payload = Encode.as_payload layout in
+          Ast_of.wrap_jane_syntax ["var"] ~payload @@
+          begin match name with
+          | None -> Ast_helper.Typ.any ~loc ~attrs ()
+          | Some name -> Ast_helper.Typ.var ~loc ~attrs name
+          end
+        | Ltyp_poly { bound_vars; inner_type } ->
+          let var_names, layouts = List.split bound_vars in
+          let tpoly = Ast_helper.Typ.poly ~loc ~attrs var_names inner_type in
+          if List.for_all Option.is_none layouts
+          then raise (No_wrap_necessary tpoly)
+          else
+            let payload = Encode.option_list_as_payload layouts in
+            Ast_of.wrap_jane_syntax ["poly"] ~payload tpoly
+
+        | Ltyp_alias { aliased_type; name; layout } ->
+          let payload = Encode.as_payload layout in
+          let has_name, inner_typ = match name with
+            | None -> "anon", { aliased_type with
+                                ptyp_attributes =
+                                  aliased_type.ptyp_attributes @ attrs }
+            | Some name -> "named", Ast_helper.Typ.alias aliased_type name
+          in
+          Ast_of.wrap_jane_syntax ["alias"; has_name] ~payload inner_typ
+      end
+    with
+      No_wrap_necessary result_type -> result_type
 
   (*******************************************************)
   (* Desugaring *)
@@ -611,22 +703,42 @@ module Layouts = struct
     let names, payload, attributes =
       Of_ast.unwrap_jane_syntax_attributes ~loc typ.ptyp_attributes
     in
-    let layout = decode_layout_from_payload ~loc payload in
     let lty = match names with
       | [ "var" ] ->
-         begin match typ.ptyp_desc with
-         | Ptyp_any ->
-           Ltyp_var { name = None; layout }
-         | Ptyp_var name ->
-           Ltyp_var { name = Some name; layout }
-         | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
-         end
+        let layout = Decode.from_payload ~loc payload in
+        begin match typ.ptyp_desc with
+        | Ptyp_any ->
+          Ltyp_var { name = None; layout }
+        | Ptyp_var name ->
+          Ltyp_var { name = Some name; layout }
+        | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
+        end
+
+      | [ "poly" ] ->
+        let layouts = Decode.option_list_from_payload ~loc payload in
+        begin match typ.ptyp_desc with
+        | Ptyp_poly (var_names, inner_type) ->
+          let bound_vars =
+            try
+              List.combine var_names layouts
+            with
+              Invalid_argument _ -> (* seems silly to check the lengths
+                                       in advance when [combine] will do this *)
+              Desugaring_error.raise ~loc
+                (Wrong_number_of_layouts(List.length var_names, layouts))
+          in
+          Ltyp_poly { bound_vars; inner_type }
+        | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
+        end
+
       | [ "alias"; "anon" ] ->
+        let layout = Decode.from_payload ~loc payload in
         Ltyp_alias { aliased_type = { typ with ptyp_attributes = attributes }
                    ; name = None
                    ; layout }
 
       | [ "alias"; "named" ] ->
+        let layout = Decode.from_payload ~loc payload in
         begin match typ.ptyp_desc with
         | Ptyp_alias (inner_typ, name) ->
           Ltyp_alias { aliased_type = inner_typ
@@ -635,6 +747,7 @@ module Layouts = struct
 
         | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
         end
+
       | _ ->
         Desugaring_error.raise ~loc (Unexpected_attribute names)
     in

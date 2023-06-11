@@ -120,12 +120,22 @@ module T = struct
     | Otag (_, t) -> sub.typ sub t
     | Oinherit t -> sub.typ sub t
 
+  let layout_annotation sub =
+    iter_loc2 sub sub.layout_annotation
+
   let type_vars_layouts sub (tvls : type_vars_layouts) =
-    List.iter (iter_opt (iter_loc2 sub sub.layout_annotation)) tvls
+    List.iter (iter_opt (layout_annotation sub)) tvls
+
+  let bound_var sub (_, layout) = match layout with
+    | None -> ()
+    | Some annot -> layout_annotation sub annot
 
   let iter_jst_layout sub : Jane_syntax.Layouts.core_type -> _ = function
     | Ltyp_var { name = _; layout } ->
       iter_loc2 sub sub.layout_annotation layout
+    | Ltyp_poly { bound_vars; inner_type } ->
+      List.iter (bound_var sub) bound_vars;
+      sub.typ sub inner_type
     | Ltyp_alias { aliased_type; name = _; layout } ->
       sub.typ sub aliased_type;
       iter_loc2 sub sub.layout_annotation layout
@@ -157,9 +167,8 @@ module T = struct
     | Ptyp_alias (t, _) -> sub.typ sub t
     | Ptyp_variant (rl, _b, _ll) ->
         List.iter (row_field sub) rl
-    | Ptyp_poly (_, t, lays) ->
+    | Ptyp_poly (_, t) ->
         sub.typ sub t;
-        type_vars_layouts sub lays
     | Ptyp_package (lid, l) ->
         iter_loc sub lid;
         List.iter (iter_tuple (iter_loc sub) (sub.typ sub)) l

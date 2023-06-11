@@ -47,8 +47,8 @@ let ghost_loc (startpos, endpos) = {
 }
 
 let mktyp ~loc ?attrs d = Typ.mk ~loc:(make_loc loc) ?attrs d
-let mkpat ~loc d = Pat.mk ~loc:(make_loc loc) d
-let mkexp ~loc d = Exp.mk ~loc:(make_loc loc) d
+let mkpat ~loc ?attrs d = Pat.mk ~loc:(make_loc loc) ?attrs d
+let mkexp ~loc ?attrs d = Exp.mk ~loc:(make_loc loc) ?attrs d
 let mkmty ~loc ?attrs d = Mty.mk ~loc:(make_loc loc) ?attrs d
 let mksig ~loc d = Sig.mk ~loc:(make_loc loc) d
 let mkmod ~loc ?attrs d = Mod.mk ~loc:(make_loc loc) ?attrs d
@@ -114,7 +114,7 @@ let mkpatvar ~loc name =
 (* See commentary about ghost locations at the declaration of Location.t *)
 let ghexp ~loc d = Exp.mk ~loc:(ghost_loc loc) d
 let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
-let ghtyp ~loc d = Typ.mk ~loc:(ghost_loc loc) d
+let ghtyp ~loc ?attrs d = Typ.mk ~loc:(ghost_loc loc) ?attrs d
 let ghloc ~loc d = { txt = d; loc = ghost_loc loc }
 let ghstr ~loc d = Str.mk ~loc:(ghost_loc loc) d
 let ghsig ~loc d = Sig.mk ~loc:(ghost_loc loc) d
@@ -283,6 +283,11 @@ let mkexp_opt_constraint ~loc e = function
 let mkpat_opt_constraint ~loc p = function
   | None -> p
   | Some typ -> mkpat ~loc (Ppat_constraint(p, typ))
+
+(* XXX layouts: remove *)
+let drop_layouts (vars_layouts, inner_type) =
+  let vars = List.map fst vars_layouts in
+  Ptyp_poly(vars, inner_type)
 
 let syntax_error () =
   raise Syntaxerr.Escape_error
@@ -535,14 +540,16 @@ let mk_newtypes ~loc newtypes exp =
     newtypes exp
 
 let wrap_type_annotation ~loc newtypes core_type body =
-  let mkexp, ghtyp = mkexp ~loc, ghtyp ~loc in
   let mk_newtypes = mk_newtypes ~loc in
-  let exp = mkexp(Pexp_constraint(body,core_type)) in
+  let exp = mkexp ~loc (Pexp_constraint(body,core_type)) in
   let exp = mk_newtypes newtypes exp in
-  let vars, layouts = List.split newtypes in
-  (exp, ghtyp(Ptyp_poly(vars, Typ.varify_constructors vars core_type, layouts)))
-
-
+  let inner_type = Typ.varify_constructors (List.map fst newtypes) core_type in
+  let ltyp =
+    Jane_syntax.Layouts.Ltyp_poly { bound_vars = newtypes; inner_type }
+  in
+  (exp,
+     Jane_syntax.Layouts.type_of
+       ~loc:(Location.ghostify (make_loc loc)) ~attrs:[] ltyp)
 
 let wrap_exp_attrs ~loc body (ext, attrs) =
   let ghexp = ghexp ~loc in
@@ -552,8 +559,8 @@ let wrap_exp_attrs ~loc body (ext, attrs) =
   | None -> body
   | Some id -> ghexp(Pexp_extension (id, PStr [mkstrexp body []]))
 
-let mkexp_attrs ~loc d attrs =
-  wrap_exp_attrs ~loc (mkexp ~loc d) attrs
+let mkexp_attrs ~loc d ext_attrs =
+  wrap_exp_attrs ~loc (mkexp ~loc d) ext_attrs
 
 let wrap_typ_attrs ~loc typ (ext, attrs) =
   (* todo: keep exact location for the entire attribute *)
@@ -1181,6 +1188,9 @@ The precedences must be listed from low to high.
 
 %inline mk_directive_arg(symb): symb
     { mk_directive_arg ~loc:$sloc $1 }
+
+%inline mktyp_jane_syntax_ltyp(symb): symb
+    { Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) ~attrs:[] $1 }
 
 /* Generic definitions */
 
@@ -2499,8 +2509,10 @@ label_let_pattern:
         lab,
         mkpat ~loc:$sloc (Ppat_constraint (pat, cty)) }
   | x = label_var COLON
-          cty = mktyp (vars = typevar_list DOT ty = core_type
-                                { Ptyp_poly(fst vars, ty, snd vars) })
+          cty = mktyp_jane_syntax_ltyp (bound_vars = typevar_list
+                                        DOT
+                                        inner_type = core_type
+                  { Jane_syntax.Layouts.Ltyp_poly { bound_vars; inner_type } })
       { let lab, pat = x in
         lab,
         mkpat ~loc:$sloc (Ppat_constraint (pat, cty)) }
@@ -2522,8 +2534,10 @@ let_pattern:
     mkpat(
       pat = pattern
       COLON
-      cty = mktyp(vars = typevar_list DOT ty = core_type
-              { Ptyp_poly(fst vars, ty, snd vars) })
+      cty = mktyp_jane_syntax_ltyp(bound_vars = typevar_list
+                                   DOT
+                                   inner_type = core_type
+              { Jane_syntax.Layouts.Ltyp_poly { bound_vars; inner_type } })
         { Ppat_constraint(pat, cty) })
       { $1 }
 ;
@@ -2897,7 +2911,7 @@ let_binding_body_no_punning:
         in
         let loc = Location.(t.ptyp_loc.loc_start, t.ptyp_loc.loc_end) in
         let local_loc = $loc($1) in
-        let typ = ghtyp ~loc (Ptyp_poly([],t,[])) in
+        let typ = ghtyp ~loc (Ptyp_poly([],t)) in
         let patloc = ($startpos($2), $endpos($3)) in
         let pat =
           mkpat_local_if $1 (ghpat ~loc:patloc (Ppat_constraint(v, typ)))
@@ -2914,7 +2928,7 @@ let_binding_body_no_punning:
         let pat =
           mkpat_local_if $1
             (ghpat ~loc:patloc
-               (Ppat_constraint($2, ghtyp ~loc:($loc($4)) $4)))
+               (Ppat_constraint($2, ghtyp ~loc:($loc($4)) (drop_layouts $4))))
             $loc($1)
         in
         let exp = mkexp_local_if $1 ~loc:$sloc ~kwd_loc:($loc($1)) $6 in
@@ -3624,11 +3638,11 @@ generalized_constructor_arguments:
                                   { (([],[]),$2,Some $4) }
   | COLON typevar_list DOT constructor_arguments MINUSGREATER atomic_type
      %prec below_HASH
-                                  { ($2,$4,Some $6) }
+                                  { (List.split $2,$4,Some $6) }
   | COLON atomic_type %prec below_HASH
                                   { (([],[]),Pcstr_tuple [],Some $2) }
   | COLON typevar_list DOT atomic_type %prec below_HASH
-                                  { ($2,Pcstr_tuple [],Some $4) }
+                                  { (List.split $2,Pcstr_tuple [],Some $4) }
 ;
 
 %inline atomic_type_gbl:
@@ -3768,18 +3782,18 @@ with_type_binder:
       { (tyvar, Some layout) }
 ;
 %inline typevar_list:
-  (* : string with_loc list * layout_annotation option list *)
+  (* : (string with_loc * layout_annotation option) list *)
   nonempty_llist(typevar)
-    { List.split $1 }
+    { $1 }
 ;
 %inline poly(X):
   typevar_list DOT X
-    { let vars, layouts = $1 in Ptyp_poly(vars, $3, layouts) }
+    { ($1, $3) }
 ;
 possibly_poly(X):
   X
     { $1 }
-| mktyp(poly(X))
+| mktyp(poly(X) { drop_layouts($1) })
     { $1 }
 ;
 %inline poly_type:
@@ -3888,9 +3902,9 @@ strict_function_type:
     { true }
 ;
 %inline param_type:
-  | mktyp(
-    LPAREN vars = typevar_list DOT ty = core_type RPAREN
-      { Ptyp_poly(fst vars, ty, snd vars) }
+  | mktyp_jane_syntax_ltyp(
+    LPAREN bound_vars = typevar_list DOT inner_type = core_type RPAREN
+      { Jane_syntax.Layouts.Ltyp_poly { bound_vars; inner_type } }
     )
     { $1 }
   | ty = tuple_type

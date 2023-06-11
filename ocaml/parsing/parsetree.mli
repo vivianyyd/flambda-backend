@@ -136,10 +136,8 @@ and core_type_desc =
             - [[< `A|`B > `X `Y ]]
                       when [flag]   is {{!Asttypes.closed_flag.Closed}[Closed]},
                        and [labels] is [Some ["X";"Y"]].
-         *)
-  | Ptyp_poly of string loc list * core_type * type_vars_layouts
-           (* XXX layouts RAE: move the layout annotations to use the extensions
-              mechanism *)
+      *)
+  | Ptyp_poly of string loc list * core_type
       (** ['a1 ... 'an. T]
 
            Can only appear in the following context:

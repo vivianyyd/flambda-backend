@@ -69,14 +69,14 @@ module Typ = struct
   let class_ ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_class (a, b))
   let alias ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_alias (a, b))
   let variant ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_variant (a, b, c))
-  let poly ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_poly (a, b, c))
+  let poly ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_poly (a, b))
   let package ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_package (a, b))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ptyp_extension a)
 
   let force_poly t =
     match t.ptyp_desc with
     | Ptyp_poly _ -> t
-    | _ -> poly ~loc:t.ptyp_loc [] t [] (* -> ghost? *)
+    | _ -> poly ~loc:t.ptyp_loc [] t (* -> ghost? *)
 
   let varify_constructors var_names t =
     let check_variable vl loc v =
@@ -116,10 +116,10 @@ module Typ = struct
         | Ptyp_variant(row_field_list, flag, lbl_lst_option) ->
             Ptyp_variant(List.map loop_row_field row_field_list,
                          flag, lbl_lst_option)
-        | Ptyp_poly(string_lst, core_type, layouts) ->
+        | Ptyp_poly(string_lst, core_type) ->
           List.iter (fun v ->
             check_variable var_names t.ptyp_loc v.txt) string_lst;
-            Ptyp_poly(string_lst, loop core_type, layouts)
+            Ptyp_poly(string_lst, loop core_type)
         | Ptyp_package(longident,lst) ->
             Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
         | Ptyp_extension (s, arg) ->

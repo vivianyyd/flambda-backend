@@ -936,11 +936,12 @@ let core_type sub ct =
     | Ttyp_variant (list, bool, labels) ->
         Ptyp_variant (List.map (sub.row_field sub) list, bool, labels)
     | Ttyp_poly (list, ct) ->
-        let vars, layouts = List.split list in
         let add_loc x = mkloc x loc in
-        let vars = List.map add_loc vars in
-        let layouts = List.map (fun lay -> Option.map add_loc lay) layouts in
-        Ptyp_poly (vars, sub.typ sub ct, layouts)
+        let bound_var (var, layout) = add_loc var, Option.map add_loc layout in
+        let bound_vars = List.map bound_var list in
+        Jane_syntax.Layouts.type_of ~loc ~attrs:[]
+          (Ltyp_poly { bound_vars; inner_type = sub.typ sub ct }) |>
+        add_jane_syntax_attributes
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
   in
   Typ.mk ~loc ~attrs:!attrs desc

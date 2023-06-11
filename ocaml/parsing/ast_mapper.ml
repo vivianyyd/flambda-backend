@@ -155,6 +155,17 @@ module T = struct
     | Ltyp_var { name; layout } ->
       let layout = map_loc_txt sub sub.layout_annotation layout in
       Ltyp_var { name; layout }
+    | Ltyp_poly { bound_vars; inner_type } ->
+      let bound_var (name, layout_opt) =
+        let name = map_loc sub name in
+        let layout_opt =
+          map_opt (map_loc_txt sub sub.layout_annotation) layout_opt
+        in
+        (name, layout_opt)
+      in
+      let bound_vars = List.map bound_var bound_vars in
+      let inner_type = sub.typ sub inner_type in
+      Ltyp_poly { bound_vars; inner_type }
     | Ltyp_alias { aliased_type; name; layout } ->
       let aliased_type = sub.typ sub aliased_type in
       let layout = map_loc_txt sub sub.layout_annotation layout in
@@ -191,10 +202,8 @@ module T = struct
     | Ptyp_alias (t, s) -> alias ~loc ~attrs (sub.typ sub t) s
     | Ptyp_variant (rl, b, ll) ->
         variant ~loc ~attrs (List.map (row_field sub) rl) b ll
-    | Ptyp_poly (sl, t, lays) ->
-        poly ~loc ~attrs (List.map (map_loc sub) sl)
-                         (sub.typ sub t)
-                         (type_vars_layouts sub lays)
+    | Ptyp_poly (sl, t) -> poly ~loc ~attrs
+                             (List.map (map_loc sub) sl) (sub.typ sub t)
     | Ptyp_package (lid, l) ->
         package ~loc ~attrs (map_loc sub lid)
           (List.map (map_tuple (map_loc sub) (sub.typ sub)) l)

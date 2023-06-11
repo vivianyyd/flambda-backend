@@ -591,8 +591,7 @@ module Make_with_extension_node
         | Some name -> Some (name, ext_loc, ext_payload, body)
 end
 
-(** The AST parameters for every subset of types; embedded as
-    [[[%jane.ERASABILITY.FEATNAME] * BODY]]. *)
+(** The AST parameters for every subset of types; embedded with attributes. *)
 module Type_AST_syntactic_category = struct
   type ast = core_type
 
@@ -605,7 +604,7 @@ module Type_AST_syntactic_category = struct
   let with_attributes typ ptyp_attributes = { typ with ptyp_attributes }
 end
 
-(** Types; embedded as [[[%jane.ERASABILITY.FEATNAME] * BODY]]. *)
+(** Types; embedded with attributes. *)
 module Core_type0 = Make_with_attribute (struct
     include Type_AST_syntactic_category
 

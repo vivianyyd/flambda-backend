@@ -96,9 +96,12 @@ module TyVarEnv : sig
   val with_univars : poly_univars -> (unit -> 'a) -> 'a
   (* evaluate with a locally extended set of univars *)
 
-  val make_poly_univars :
+  val make_poly_univars : string Location.loc list -> poly_univars
+  (* a version of [make_poly_univars_layouts] that doesn't take layouts *)
+
+  val make_poly_univars_layouts :
     context:(string -> Layout.annotation_context) ->
-    string Location.loc list -> type_vars_layouts -> poly_univars
+    (string Location.loc * layout_annotation option) list -> poly_univars
   (* see mli file *)
 
   val check_poly_univars : Env.t -> Location.t -> poly_univars -> type_expr list
@@ -232,17 +235,27 @@ end = struct
       f
       ~finally:(fun () -> univars := old_univars)
 
-  let make_poly_univars ~context vars layouts =
-    let mk_pair v l =
-      let name = v.txt in
-      let original_layout = Layout.of_annotation_option_default l
-                              ~default:(Layout.value ~why:Univar)
-                              ~context:(context name)
-      in
-      let layout_info = { original_layout; defaulted = Option.is_none l } in
-      name, newvar ~name original_layout, layout_info
+  let mk_poly_univars_triple_with_layout ~context var layout =
+    let name = var.txt in
+    let original_layout = Layout.of_annotation ~context:(context name) layout in
+    let layout_info = { original_layout; defaulted = false } in
+    name, newvar ~name original_layout, layout_info
+
+  let mk_poly_univars_triple_without_layout var =
+    let name = var.txt in
+    let original_layout = Layout.value ~why:Univar in
+    let layout_info = { original_layout; defaulted = true } in
+    name, newvar ~name original_layout, layout_info
+
+  let make_poly_univars vars =
+    List.map mk_poly_univars_triple_without_layout vars
+
+  let make_poly_univars_layouts ~context vars_layouts =
+    let mk_trip = function
+        | (v, None) -> mk_poly_univars_triple_without_layout v
+        | (v, Some l) -> mk_poly_univars_triple_with_layout ~context v l
     in
-    List.map2 mk_pair vars layouts
+    List.map mk_trip vars_layouts
 
   let check_poly_univars env loc vars =
     vars |> List.iter (fun (_, v, _) -> generalize v);
@@ -412,9 +425,6 @@ let newvar ?name layout =
 let valid_tyvar_name name =
   name <> "" && name.[0] <> '_'
 
-let make_typed_univars vars layouts : (string * Layout.const option) list =
-  List.map2 (fun v l -> v.txt, Option.map Location.get_txt l) vars layouts
-
 let transl_type_param_var ~generic env loc attrs name_opt
       (layout : layout) (layout_annot : const_layout option) =
   let tvar = Ttyp_var (name_opt, layout_annot) in
@@ -447,7 +457,7 @@ let transl_type_param_jst ~generic env loc attrs path :
      in
      transl_type_param_var ~generic env loc attrs name layout (Some annot.txt),
      layout
-  | Jtyp_layout (Ltyp_alias _) -> assert false
+  | Jtyp_layout (Ltyp_poly _ | Ltyp_alias _) -> assert false
 
 let transl_type_param ~generic env path styp : Typedtree.core_type * layout =
   let loc = styp.ptyp_loc in
@@ -512,6 +522,19 @@ let check_arg_type styp =
                       Unsupported_extension Polymorphic_parameters))
     | _ -> ()
   end
+
+(* translate the ['a 'b ('c : immediate) .] part of a polytype,
+   returning something suitable as the first argument of Ttyp_poly and
+   a [poly_univars] *)
+let transl_bound_vars : (_, _) Either.t -> _ =
+  let mk_one v = v.txt, None in
+  let mk_pair (v, l) = v.txt, Option.map Location.get_txt l in
+  function
+  | Left vars_only -> List.map mk_one vars_only,
+                      TyVarEnv.make_poly_univars vars_only
+  | Right vars_layouts -> List.map mk_pair vars_layouts,
+                          TyVarEnv.make_poly_univars_layouts
+                            ~context:(fun v -> Univar v) vars_layouts
 
 let rec transl_type env policy mode styp =
   Builtin_attributes.warning_scope styp.ptyp_attributes
@@ -827,23 +850,11 @@ and transl_type_aux env policy mode styp =
       in
       let ty = newty (Tvariant (make_row more)) in
       ctyp (Ttyp_variant (tfields, closed, present)) ty
-  | Ptyp_poly(vars, st, layouts) ->
-      let typed_vars = make_typed_univars vars layouts in
-      begin_def();
-      let new_univars =
-        TyVarEnv.make_poly_univars ~context:(fun v -> Univar v) vars layouts
+  | Ptyp_poly(vars, st) ->
+      let desc, typ =
+        transl_type_poly env policy mode styp.ptyp_loc (Either.Left vars) st
       in
-      let cty = TyVarEnv.with_univars new_univars begin fun () ->
-        transl_type env policy mode st
-      end in
-      let ty = cty.ctyp_type in
-      end_def();
-      generalize ty;
-      let ty_list = TyVarEnv.check_poly_univars env styp.ptyp_loc new_univars in
-      let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
-      let ty' = Btype.newgenty (Tpoly(ty, ty_list)) in
-      unify_var env (newvar (Layout.any ~why:Dummy_layout)) ty';
-      ctyp (Ttyp_poly (typed_vars, cty)) ty'
+      ctyp desc typ
   | Ptyp_package (p, l) ->
     (* CR layouts: right now we're doing a real gross hack where we demand
        everything in a package type with constraint be value.
@@ -894,6 +905,8 @@ and transl_type_aux_jst_layout env policy mode loc :
     TyVarEnv.new_anon_var loc env tlayout policy
   | Ltyp_var { name = Some name; layout } ->
     transl_type_var env policy loc name (Some layout)
+  | Ltyp_poly { bound_vars; inner_type } ->
+    transl_type_poly env policy mode loc (Either.Right bound_vars) inner_type
   | Ltyp_alias { aliased_type; name; layout } ->
     transl_type_alias env policy mode loc aliased_type name (Some layout)
 
@@ -924,6 +937,21 @@ and transl_type_var env policy loc name layout_annot_opt =
       ty
   in
   Ttyp_var (Some name, Option.map Location.get_txt layout_annot_opt), ty
+
+and transl_type_poly env policy mode loc (vars : (_, _) Either.t) st =
+  begin_def();
+  let typed_vars, new_univars = transl_bound_vars vars in
+  let cty = TyVarEnv.with_univars new_univars begin fun () ->
+    transl_type env policy mode st
+  end in
+  let ty = cty.ctyp_type in
+  end_def();
+  generalize ty;
+  let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
+  let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
+  let ty' = Btype.newgenty (Tpoly(ty, ty_list)) in
+  unify_var env (newvar (Layout.any ~why:Dummy_layout)) ty';
+  Ttyp_poly (typed_vars, cty), ty'
 
 and transl_type_alias env policy mode alias_loc styp name_opt layout_annot_opt =
   let cty = match name_opt with
@@ -1143,36 +1171,52 @@ let transl_simple_type_delayed env mode styp =
   generalize typ.ctyp_type;
   (typ, instance typ.ctyp_type, force)
 
+let transl_type_scheme_mono env styp =
+  begin_def();
+  let typ = transl_simple_type env ~closed:false Alloc_mode.Global styp in
+  end_def();
+  (* This next line is very important: it stops [val] and [external]
+     declarations from having undefaulted layout variables. Without
+     this line, we might accidentally export a layout-flexible definition
+     from a compilation unit, which would lead to miscompilation. *)
+  remove_mode_and_layout_variables typ.ctyp_type;
+  generalize typ.ctyp_type;
+  typ
+
+let transl_type_scheme_poly env attrs loc vars inner_type =
+  begin_def();
+  let typed_vars, univars = transl_bound_vars vars in
+  let typ =
+    transl_simple_type env ~univars ~closed:true Alloc_mode.Global inner_type
+  in
+  end_def();
+  generalize typ.ctyp_type;
+  let _ = TyVarEnv.instance_poly_univars env loc univars in
+  { ctyp_desc = Ttyp_poly (typed_vars, typ);
+    ctyp_type = typ.ctyp_type;
+    ctyp_env = env;
+    ctyp_loc = loc;
+    ctyp_attributes = attrs }
+
+let transl_type_scheme_jst env styp attrs loc : Jane_syntax.Core_type.t -> _ =
+  function
+  | Jtyp_layout (Ltyp_poly { bound_vars; inner_type }) ->
+    transl_type_scheme_poly env attrs loc (Right bound_vars) inner_type
+  | Jtyp_layout (Ltyp_var _ | Ltyp_alias _) ->
+    transl_type_scheme_mono env styp
+
 let transl_type_scheme env styp =
   TyVarEnv.reset ();
+  match Jane_syntax.Core_type.of_ast styp with
+  | Some (etyp, attrs) ->
+    transl_type_scheme_jst env styp attrs styp.ptyp_loc etyp
+  | None ->
   match styp.ptyp_desc with
-  | Ptyp_poly (vars, st, layouts) ->
-     let typed_vars = make_typed_univars vars layouts in
-     begin_def();
-     let univars =
-       TyVarEnv.make_poly_univars ~context:(fun v -> Univar v) vars layouts
-     in
-     let typ = transl_simple_type env ~univars ~closed:true Alloc_mode.Global st in
-     end_def();
-     generalize typ.ctyp_type;
-     let _ = TyVarEnv.instance_poly_univars env styp.ptyp_loc univars in
-     { ctyp_desc = Ttyp_poly (typed_vars, typ);
-       ctyp_type = typ.ctyp_type;
-       ctyp_env = env;
-       ctyp_loc = styp.ptyp_loc;
-       ctyp_attributes = styp.ptyp_attributes }
+  | Ptyp_poly (vars, st) ->
+    transl_type_scheme_poly env styp.ptyp_attributes
+      styp.ptyp_loc (Either.Left vars) st
   | _ ->
-     begin_def();
-     let typ = transl_simple_type env ~closed:false Alloc_mode.Global styp in
-     end_def();
-     (* This next line is very important: it stops [val] and [external]
-        declarations from having undefaulted layout variables. Without
-        this line, we might accidentally export a layout-flexible definition
-        from a compilation unit, which would lead to miscompilation. *)
-     remove_mode_and_layout_variables typ.ctyp_type;
-     generalize typ.ctyp_type;
-     typ
-
+    transl_type_scheme_mono env styp
 
 (* Error report *)
 

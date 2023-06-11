@@ -135,6 +135,11 @@ module Layouts : sig
     | Ltyp_var of { name : string option
                   ; layout : Asttypes.layout_annotation }
 
+    (* [('a : immediate) 'b 'c ('d : value). 'a -> 'b -> 'c -> 'd] *)
+    | Ltyp_poly of { bound_vars : (string Location.loc *
+                                   Asttypes.layout_annotation option) list
+                   ; inner_type : Parsetree.core_type }
+
     (* [ty as ('a : immediate)] *)
     | Ltyp_alias of { aliased_type : Parsetree.core_type
                     ; name : string option
@@ -311,3 +316,5 @@ val set_print_payload :
   (Format.formatter -> Parsetree.payload -> unit) -> unit
 val set_print_core_type :
   (Format.formatter -> Parsetree.core_type -> unit) -> unit
+val set_print_layout_annotation :
+  (Format.formatter -> Asttypes.layout_annotation -> unit) -> unit

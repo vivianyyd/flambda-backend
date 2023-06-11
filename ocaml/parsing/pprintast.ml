@@ -299,6 +299,8 @@ let tyvar_layout_loc ~print_quote f (str,layout) =
   match layout with
   | None -> pptv f str.txt
   | Some lay -> Format.fprintf f "(%a : %a)" pptv str.txt layout_annotation lay
+
+let tyvar_loc f str = tyvar f str.txt
 let string_quot f x = pp f "`%s" x
 
 let maybe_local_type pty ctxt f c =
@@ -335,18 +337,17 @@ and core_type ctxt f x =
         pp f "@[<2>%a@;->@;%a@]" (* FIXME remove parens later *)
           (type_with_label ctxt) (l,ct1) (return_type ctxt) ct2
     | Ptyp_alias (ct, s) ->
-        pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct tyvar s
-    | Ptyp_poly ([], ct, []) ->
+      pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct tyvar s
+    | Ptyp_poly ([], ct) ->
         core_type ctxt f ct
-    | Ptyp_poly (sl, ct, lays) ->
+    | Ptyp_poly (sl, ct) ->
         pp f "@[<2>%a%a@]"
-               (fun f (v,l) -> match v with
+               (fun f l -> match l with
                   | [] -> ()
                   | _ ->
                       pp f "%a@;.@;"
-                        (list (tyvar_layout_loc ~print_quote:true) ~sep:"@;")
-                        (List.combine v l))
-          (sl,lays) (core_type ctxt) ct
+                        (list tyvar_loc ~sep:"@;")  l)
+          sl (core_type ctxt) ct
     | _ -> pp f "@[<2>%a@]" (core_type1 ctxt) x
 
 and core_type1 ctxt f x =
@@ -1423,7 +1424,7 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; _} =
     let gadt_pattern =
       match p with
       | {ppat_desc=Ppat_constraint({ppat_desc=Ppat_var _} as pat,
-                                   {ptyp_desc=Ptyp_poly (args_tyvars, rt, _)});
+                                   {ptyp_desc=Ptyp_poly (args_tyvars, rt)});
          ppat_attributes=[]}->
           Some (pat, args_tyvars, rt)
       | _ -> None in
@@ -1982,4 +1983,3 @@ let structure_item = structure_item reset_ctxt
 let signature_item = signature_item reset_ctxt
 let binding = binding reset_ctxt
 let payload = payload reset_ctxt
-

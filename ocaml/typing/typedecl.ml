@@ -437,9 +437,9 @@ let make_constructor
         | [] -> None, false
         | vs ->
            Ctype.begin_def();
-           Some (TyVarEnv.make_poly_univars
+           Some (TyVarEnv.make_poly_univars_layouts
                    ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
-                   vs slays), true
+                   (List.combine vs slays)), true
       in
       let args, targs =
         transl_constructor_arguments env univars closed sargs
@@ -1917,7 +1917,7 @@ let rec parse_native_repr_attributes env core_type ty rmode ~global_repr =
       parse_native_repr_attributes env ct2 t2 (prim_const_mode mret) ~global_repr
     in
     ((mode,repr_arg) :: repr_args, repr_res)
-  | (Ptyp_poly (_, t, _) | Ptyp_alias (t, _)), _, _ ->
+  | (Ptyp_poly (_, t) | Ptyp_alias (t, _)), _, _ ->
      parse_native_repr_attributes env t ty rmode ~global_repr
   | _ ->
      let rmode =

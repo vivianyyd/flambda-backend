@@ -122,7 +122,7 @@ let rec add_type bv ty =
           | Rtag(_, _, stl) -> List.iter (add_type bv) stl
           | Rinherit sty -> add_type bv sty)
         fl
-  | Ptyp_poly(_, t, _) -> add_type bv t
+  | Ptyp_poly(_, t) -> add_type bv t
   | Ptyp_package pt -> add_package_type bv pt
   | Ptyp_extension e -> handle_extension e
 
@@ -132,6 +132,10 @@ and add_type_jst bv : Jane_syntax.Core_type.t -> _ = function
 and add_type_jst_layouts bv : Jane_syntax.Layouts.core_type -> _ = function
   | Ltyp_var { name = _; layout } ->
     add_layout bv layout
+  | Ltyp_poly { bound_vars; inner_type } ->
+    List.iter
+      (fun (_, layout) -> Option.iter (add_layout bv) layout) bound_vars;
+    add_type bv inner_type
   | Ltyp_alias { aliased_type; name = _; layout } ->
     add_type bv aliased_type;
     add_layout bv layout
