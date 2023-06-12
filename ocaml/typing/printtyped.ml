@@ -156,7 +156,7 @@ let arg_label i ppf = function
 ;;
 
 let typevars ppf vs =
-  List.iter (fun x -> fprintf ppf " %a" Pprintast.tyvar x.txt) vs
+  List.iter (fun x -> fprintf ppf " %a" Printast.tyvar x.txt) vs
 ;;
 
 let layout_array i ppf layouts =

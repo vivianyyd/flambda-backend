@@ -30,3 +30,10 @@ val top_phrase : formatter -> toplevel_phrase -> unit;;
 val expression: int -> formatter -> expression -> unit
 val structure: int -> formatter -> structure -> unit
 val payload: int -> formatter -> payload -> unit
+val core_type: int -> formatter -> core_type -> unit
+
+val const_layout_to_string: Asttypes.const_layout -> string
+
+val tyvar: Format.formatter -> string -> unit
+  (** Print a type variable name, taking care of the special treatment
+      required for the single quote character in second position. *)
