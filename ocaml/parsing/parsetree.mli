@@ -604,9 +604,7 @@ and type_exception =
 (** Definition of a new exception ([exception E]). *)
 
 and extension_constructor_kind =
-  (* XXX layouts RAE: use extensions for the type_vars_layouts *)
   | Pext_decl of string loc list * constructor_arguments * core_type option
-                          * type_vars_layouts
       (** [Pext_decl(existentials, c_args, t_opt)]
           describes a new extension constructor. It can be:
           - [C of T1 * ... * Tn] when:
@@ -626,6 +624,7 @@ and extension_constructor_kind =
                    {- [c_args] is [[T1; ... ; Tn]],}
                    {- [t_opt] is [Some T0].}}
        *)
+
   | Pext_rebind of Longident.t loc
   (** [Pext_rebind(D)] re-export the constructor [D] with the new name [C] *)
 

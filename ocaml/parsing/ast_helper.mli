@@ -236,8 +236,7 @@ module Te:
       str -> extension_constructor_kind -> extension_constructor
 
     val decl: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->
-      ?vars:(str list * layout_annotation option list) ->
-      ?args:constructor_arguments -> ?res:core_type ->
+      ?vars:str list -> ?args:constructor_arguments -> ?res:core_type ->
       str ->
       extension_constructor
     val rebind: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?info:info ->

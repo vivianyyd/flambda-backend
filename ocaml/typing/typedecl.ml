@@ -1528,40 +1528,53 @@ let transl_type_decl env rec_flag sdecl_list =
   (final_decls, final_env)
 
 (* Translating type extensions *)
-let transl_extension_constructor_jst ~scope:_ _env _type_path _type_params
-      _typext_params _priv _id _attrs : Jane_syntax.Extension_constructor.t -> _ =
-  function
-  | _ -> .
+let transl_extension_constructor_decl
+      env type_path typext_params loc id (svars : _ Either.t) sargs sret_type =
+  (* XXX layouts: remove this *)
+  let svars, slays = match svars with
+    | Left svars -> svars, List.map (fun _ -> None) svars
+    | Right svars_slays -> List.split svars_slays
+  in
+  let targs, tret_type, args, ret_type =
+    make_constructor env loc
+      ~cstr_path:(Pident id) ~type_path typext_params
+      svars slays sargs sret_type
+  in
+  let num_args =
+    match targs with
+    | Cstr_tuple args -> List.length args
+    | Cstr_record _ -> 1
+  in
+  let layouts = Array.make num_args (Layout.any ~why:Dummy_layout) in
+  let args, constant =
+    update_constructor_arguments_layouts env loc args layouts
+  in
+  let strip_locs sv sl = sv.txt, Option.map Location.get_txt sl in
+  let vars = List.map2 strip_locs svars slays in
+  args, layouts, constant, ret_type,
+  Text_decl(vars, targs, tret_type)
+
+let transl_extension_constructor_jst env type_path _type_params
+      typext_params _priv loc id _attrs :
+  Jane_syntax.Extension_constructor.t -> _ = function
+  | Jext_layout (Lext_decl(vars_layouts, args, res)) ->
+    transl_extension_constructor_decl
+      env type_path typext_params loc id (Right vars_layouts) args res
 
 let transl_extension_constructor ~scope env type_path type_params
                                  typext_params priv sext =
   let id = Ident.create_scoped ~scope sext.pext_name.txt in
+  let loc = sext.pext_loc in
   let args, arg_layouts, constant, ret_type, kind =
     match Jane_syntax.Extension_constructor.of_ast sext with
     | Some (jext, attrs) ->
       transl_extension_constructor_jst
-        ~scope env type_path type_params typext_params priv id attrs jext
+        env type_path type_params typext_params priv loc id attrs jext
     | None ->
     match sext.pext_kind with
-      Pext_decl(svars, sargs, sret_type, slays) ->
-        let targs, tret_type, args, ret_type =
-          make_constructor env sext.pext_loc
-            ~cstr_path:(Pident id) ~type_path typext_params
-            svars slays sargs sret_type
-        in
-        let num_args =
-          match targs with
-          | Cstr_tuple args -> List.length args
-          | Cstr_record _ -> 1
-        in
-        let layouts = Array.make num_args (Layout.any ~why:Dummy_layout) in
-        let args, constant =
-          update_constructor_arguments_layouts env sext.pext_loc args layouts
-        in
-        let strip_locs sv sl = sv.txt, Option.map Location.get_txt sl in
-        let vars = List.map2 strip_locs svars slays in
-          args, layouts, constant, ret_type,
-          Text_decl(vars, targs, tret_type)
+      Pext_decl(svars, sargs, sret_type) ->
+      transl_extension_constructor_decl
+        env type_path typext_params loc id (Left svars) sargs sret_type
     | Pext_rebind lid ->
         let usage : Env.constructor_usage =
           if priv = Public then Env.Exported else Env.Exported_private

@@ -2,23 +2,6 @@ open Asttypes
 open Parsetree
 open Jane_syntax_parsing
 
-(*****************************************************)
-(* Printers, to avoid interdependency with Pprintast *)
-
-let print_payload : (Format.formatter -> payload -> unit) ref =
-  ref (fun _ _ -> assert false)
-let set_print_payload payload = print_payload := payload
-
-let print_core_type : (Format.formatter -> core_type -> unit) ref =
-  ref (fun _ _ -> assert false)
-let set_print_core_type core_type = print_core_type := core_type
-
-let print_layout_annotation :
-  (Format.formatter -> layout_annotation -> unit) ref =
-  ref (fun _ _ -> assert false)
-let set_print_layout_annotation layout_annotation =
-  print_layout_annotation := layout_annotation
-
 (****************************************)
 (* Helpers used just within this module *)
 
@@ -503,9 +486,6 @@ module Layouts = struct
     let extension_string = Feature.extension_component feature
   end
 
-  module Ast_of = Ast_of (Core_type) (Ext)
-  module Of_ast = Of_ast (Ext)
-
   include Ext
 
   type nonrec core_type =
@@ -517,6 +497,12 @@ module Layouts = struct
                     ; name : string option
                     ; layout : Asttypes.layout_annotation }
 
+  type nonrec extension_constructor =
+    | Lext_decl of (string Location.loc *
+                    Asttypes.layout_annotation option) list *
+                   constructor_arguments *
+                   Parsetree.core_type option
+
   (*******************************************************)
   (* Errors *)
 
@@ -524,6 +510,7 @@ module Layouts = struct
     type error =
       | Not_a_layout of Parsetree.payload
       | Unexpected_wrapped_type of Parsetree.core_type
+      | Unexpected_wrapped_ext of Parsetree.extension_constructor
       | Unexpected_attribute of string list
       | Wrong_number_of_layouts of int * layout_annotation option list
 
@@ -534,8 +521,12 @@ module Layouts = struct
             (Printast.payload 0) payload
       | Unexpected_wrapped_type typ ->
           Location.errorf ~loc
-            "Layout alias is not an alias type:@;%a"
+            "Layout attribute on wrong core type:@;%a"
             (Printast.core_type 0) typ
+      | Unexpected_wrapped_ext ext ->
+          Location.errorf ~loc
+            "Layout attribute on wrong extension constructor:@;%a"
+            (Printast.extension_constructor 0) ext
       | Unexpected_attribute names ->
           Location.errorf ~loc
             "Layout extension does not understand these attribute names:@;[%a]"
@@ -550,7 +541,7 @@ module Layouts = struct
             (Format.pp_print_list
                (Format.pp_print_option
                   ~none:(fun ppf () -> Format.fprintf ppf "None")
-                  !print_layout_annotation))
+                  (Printast.layout_annotation 0)))
             layouts
 
     exception Error of Location.t * error
@@ -608,8 +599,9 @@ module Layouts = struct
 
   module Decode : sig
     val from_payload : loc:Location.t -> payload -> layout_annotation
-    val option_list_from_payload :
-      loc:Location.t -> payload -> layout_annotation option list
+    val bound_vars_from_vars_and_payload :
+      loc:Location.t -> string Location.loc list -> payload ->
+      (string Location.loc * layout_annotation option) list
   end = struct
     exception Unexpected
 
@@ -655,12 +647,23 @@ module Layouts = struct
         | _ -> raise Unexpected
       with
         Unexpected -> Desugaring_error.raise ~loc (Not_a_layout payload)
+
+    let bound_vars_from_vars_and_payload ~loc var_names payload =
+      let layouts = option_list_from_payload ~loc payload in
+      try
+        List.combine var_names layouts
+      with
+      (* seems silly to check the length in advance when [combine] does *)
+        Invalid_argument _ ->
+        Desugaring_error.raise ~loc
+          (Wrong_number_of_layouts(List.length var_names, layouts))
   end
 
   (*******************************************************)
-  (* Encoding *)
+  (* Encoding types *)
 
   let type_of ~loc ~attrs typ =
+    let module Ast_of = Ast_of (Core_type) (Ext) in
     let exception No_wrap_necessary of Parsetree.core_type in
     try
       (* See Note [Wrapping with make_entire_jane_syntax] *)
@@ -675,6 +678,7 @@ module Layouts = struct
           end
         | Ltyp_poly { bound_vars; inner_type } ->
           let var_names, layouts = List.split bound_vars in
+          (* Pass the loc because we don't want a ghost location here *)
           let tpoly = Ast_helper.Typ.poly ~loc ~attrs var_names inner_type in
           if List.for_all Option.is_none layouts
           then raise (No_wrap_necessary tpoly)
@@ -696,9 +700,10 @@ module Layouts = struct
       No_wrap_necessary result_type -> result_type
 
   (*******************************************************)
-  (* Desugaring *)
+  (* Desugaring types *)
 
   let of_type typ =
+    let module Of_ast = Of_ast (Ext) in
     let loc = typ.ptyp_loc in
     let names, payload, attributes =
       Of_ast.unwrap_jane_syntax_attributes ~loc typ.ptyp_attributes
@@ -715,17 +720,10 @@ module Layouts = struct
         end
 
       | [ "poly" ] ->
-        let layouts = Decode.option_list_from_payload ~loc payload in
         begin match typ.ptyp_desc with
         | Ptyp_poly (var_names, inner_type) ->
           let bound_vars =
-            try
-              List.combine var_names layouts
-            with
-              Invalid_argument _ -> (* seems silly to check the lengths
-                                       in advance when [combine] will do this *)
-              Desugaring_error.raise ~loc
-                (Wrong_number_of_layouts(List.length var_names, layouts))
+            Decode.bound_vars_from_vars_and_payload ~loc var_names payload
           in
           Ltyp_poly { bound_vars; inner_type }
         | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
@@ -752,6 +750,60 @@ module Layouts = struct
         Desugaring_error.raise ~loc (Unexpected_attribute names)
     in
     lty, attributes
+
+  (*******************************************************)
+  (* Encoding extension constructor *)
+
+  let extension_constructor_of ~loc ~name ~attrs ?info ?docs ext =
+    (* using optional parameters to hook into existing defaulting
+       in Ast_helper.Te.decl, which seems unwise to duplicate *)
+    let module Ast_of = Ast_of (Extension_constructor) (Ext) in
+    let exception No_wrap_necessary of Parsetree.extension_constructor in
+    try
+      (* See Note [Wrapping with make_entire_jane_syntax] *)
+        Extension_constructor.make_entire_jane_syntax ~loc feature
+          begin fun () ->
+            match ext with
+            | Lext_decl (bound_vars, args, res) ->
+              let vars, layouts = List.split bound_vars in
+              let ext_ctor =
+                (* Pass ~loc here, because the constructor declaration is
+                   not a ghost *)
+                Ast_helper.Te.decl ~loc ~attrs ~vars ~args ?info ?docs ?res name
+              in
+              if List.for_all Option.is_none layouts
+              then raise (No_wrap_necessary ext_ctor)
+              else
+                let payload = Encode.option_list_as_payload layouts in
+                Ast_of.wrap_jane_syntax ["ext"] ~payload ext_ctor
+          end
+    with
+      No_wrap_necessary ext_ctor -> ext_ctor
+
+  (*******************************************************)
+  (* Desugaring extension constructor *)
+
+  let of_extension_constructor ext =
+    let module Of_ast = Of_ast (Ext) in
+    let loc = ext.pext_loc in
+    let names, payload, attributes =
+      Of_ast.unwrap_jane_syntax_attributes ~loc ext.pext_attributes
+    in
+    let lext = match names with
+      | [ "ext" ] ->
+        begin match ext.pext_kind with
+        | Pext_decl (var_names, args, res) ->
+          let bound_vars =
+            Decode.bound_vars_from_vars_and_payload ~loc var_names payload
+          in
+          Lext_decl (bound_vars, args, res)
+        | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_ext ext)
+        end
+
+      | _ ->
+        Desugaring_error.raise ~loc (Unexpected_attribute names)
+    in
+    lext, attributes
 end
 
 (******************************************************************************)
@@ -873,10 +925,18 @@ module Structure_item = struct
 end
 
 module Extension_constructor = struct
-  type t = |
+  type t =
+    | Jext_layout of Layouts.extension_constructor
 
-  let of_ast_internal (feat : Feature.t) _ext = match feat with
+  let of_ast_internal (feat : Feature.t) ext = match feat with
+    | Language_extension Layouts ->
+      let ext, attrs = Layouts.of_extension_constructor ext in
+      Some (Jext_layout ext, attrs)
     | _ -> None
 
   let of_ast = Extension_constructor.make_of_ast ~of_ast_internal
+
+  let extension_constructor_of ~loc ~name ~attrs ?info ?docs = function
+    | Jext_layout lext ->
+      Layouts.extension_constructor_of ~loc ~name ~attrs ?info ?docs lext
 end

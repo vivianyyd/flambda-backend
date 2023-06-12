@@ -3591,7 +3591,7 @@ generic_constructor_declaration(opening):
   d = generic_constructor_declaration(opening)
     {
       let cid, vars, args, res, attrs, loc, info = d in
-      Type.constructor cid ~vars ~args ?res ~attrs ~loc ~info
+      Type.constructor cid ~vars:(List.split vars) ~args ?res ~attrs ~loc ~info
     }
 ;
 str_exception_declaration:
@@ -3619,30 +3619,38 @@ sig_exception_declaration:
   vars_args_res = generalized_constructor_arguments
   attrs2 = attributes
   attrs = post_item_attributes
-    { let vars, args, res = vars_args_res in
+    { let vars_layouts, args, res = vars_args_res in
       let loc = make_loc ($startpos, $endpos(attrs2)) in
       let docs = symbol_docs $sloc in
-      Te.mk_exception ~attrs
-        (Te.decl id ~vars ~args ?res ~attrs:(attrs1 @ attrs2) ~loc ~docs)
-      , ext }
+      let ext_ctor =
+        Jane_syntax.Layouts.extension_constructor_of
+          ~loc ~name:id ~attrs:(attrs1 @ attrs2) ~docs
+          (Lext_decl (vars_layouts, args, res))
+      in
+      Te.mk_exception ~attrs ext_ctor, ext }
 ;
 %inline let_exception_declaration:
     mkrhs(constr_ident) generalized_constructor_arguments attributes
-      { let vars, args, res = $2 in
-        Te.decl $1 ~vars ~args ?res ~attrs:$3 ~loc:(make_loc $sloc) }
+      { let vars_layouts, args, res = $2 in
+        Jane_syntax.Layouts.extension_constructor_of
+            ~loc:(make_loc $sloc)
+            ~name:$1
+            ~attrs:$3
+            (Lext_decl (vars_layouts, args, res)) }
 ;
+
 generalized_constructor_arguments:
-    /*empty*/                     { (([],[]),Pcstr_tuple [],None) }
-  | OF constructor_arguments      { (([],[]),$2,None) }
+    /*empty*/                     { ([],Pcstr_tuple [],None) }
+  | OF constructor_arguments      { ([],$2,None) }
   | COLON constructor_arguments MINUSGREATER atomic_type %prec below_HASH
-                                  { (([],[]),$2,Some $4) }
+                                  { ([],$2,Some $4) }
   | COLON typevar_list DOT constructor_arguments MINUSGREATER atomic_type
      %prec below_HASH
-                                  { (List.split $2,$4,Some $6) }
+                                  { ($2,$4,Some $6) }
   | COLON atomic_type %prec below_HASH
-                                  { (([],[]),Pcstr_tuple [],Some $2) }
+                                  { ([],Pcstr_tuple [],Some $2) }
   | COLON typevar_list DOT atomic_type %prec below_HASH
-                                  { (List.split $2,Pcstr_tuple [],Some $4) }
+                                  { ($2,Pcstr_tuple [],Some $4) }
 ;
 
 %inline atomic_type_gbl:
@@ -3720,8 +3728,9 @@ label_declaration_semi:
 %inline extension_constructor_declaration(opening):
   d = generic_constructor_declaration(opening)
     {
-      let cid, vars, args, res, attrs, loc, info = d in
-      Te.decl cid ~vars ~args ?res ~attrs ~loc ~info
+      let name, vars_layouts, args, res, attrs, loc, info = d in
+      Jane_syntax.Layouts.extension_constructor_of
+        ~loc ~attrs ~info ~name (Lext_decl(vars_layouts, args, res))
     }
 ;
 extension_constructor_rebind(opening):

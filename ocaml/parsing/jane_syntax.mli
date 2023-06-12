@@ -148,6 +148,22 @@ module Layouts : sig
   val type_of :
     loc:Location.t -> attrs:Parsetree.attributes ->
     core_type -> Parsetree.core_type
+
+  type nonrec extension_constructor =
+    (* [ 'a ('b : immediate) ('c : float64). 'a * 'b * 'c -> exception ] *)
+    | Lext_decl of (string Location.loc *
+                    Asttypes.layout_annotation option) list *
+                   Parsetree.constructor_arguments *
+                   Parsetree.core_type option
+
+  val extension_constructor_of :
+    loc:Location.t ->
+    name:string Location.loc ->
+    attrs:Parsetree.attributes ->
+    ?info:Docstrings.info ->
+    ?docs:Docstrings.docs ->
+    extension_constructor ->
+    Parsetree.extension_constructor
 end
 
 (******************************************)
@@ -303,18 +319,15 @@ end
 
 (** Novel syntax in extension constructors *)
 module Extension_constructor : sig
-  type t = |
+  type t =
+    | Jext_layout of Layouts.extension_constructor
 
   include AST with type t := t * Parsetree.attributes
                and type ast := Parsetree.extension_constructor
+
+  val extension_constructor_of :
+    loc:Location.t -> name:string Location.loc -> attrs:Parsetree.attributes ->
+    ?info:Docstrings.info -> ?docs:Docstrings.docs -> t ->
+    Parsetree.extension_constructor
 end
 
-(*************************)
-(* Avoiding module loops *)
-
-val set_print_payload :
-  (Format.formatter -> Parsetree.payload -> unit) -> unit
-val set_print_core_type :
-  (Format.formatter -> Parsetree.core_type -> unit) -> unit
-val set_print_layout_annotation :
-  (Format.formatter -> Asttypes.layout_annotation -> unit) -> unit

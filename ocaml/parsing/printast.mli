@@ -31,6 +31,7 @@ val expression: int -> formatter -> expression -> unit
 val structure: int -> formatter -> structure -> unit
 val payload: int -> formatter -> payload -> unit
 val core_type: int -> formatter -> core_type -> unit
+val extension_constructor: int -> formatter -> extension_constructor -> unit
 
 val layout_annotation: int -> formatter -> Asttypes.layout_annotation -> unit
 val const_layout_to_string: Asttypes.const_layout -> string

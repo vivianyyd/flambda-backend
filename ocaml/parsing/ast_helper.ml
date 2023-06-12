@@ -596,11 +596,10 @@ module Te = struct
     }
 
   let decl ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-         ?(info = empty_info) ?(vars = [],[]) ?(args = Pcstr_tuple []) ?res name =
-    let vars, layouts = vars in
+         ?(info = empty_info) ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
     {
      pext_name = name;
-     pext_kind = Pext_decl(vars, args, res, layouts);
+     pext_kind = Pext_decl(vars, args, res);
      pext_loc = loc;
      pext_attributes = add_docs_attrs docs (add_info_attrs info attrs);
     }

@@ -524,9 +524,9 @@ and extension_constructor i ppf x =
 
 and extension_constructor_kind i ppf x =
   match x with
-      Pext_decl(v, a, r, l) ->
+      Pext_decl(v, a, r) ->
         line i ppf "Pext_decl\n";
-        if v <> [] then line (i+1) ppf "vars%a\n" typevars_layouts (v,l);
+        if v <> [] then line (i+1) ppf "vars%a\n" typevars v;
         constructor_arguments (i+1) ppf a;
         option (i+1) core_type ppf r;
     | Pext_rebind li ->

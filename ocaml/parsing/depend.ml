@@ -99,6 +99,10 @@ let handle_extension ext =
    prefixes. *)
 let add_layout _bv (_layout : Asttypes.layout_annotation) = ()
 
+let add_vars_layouts bv vars_layouts =
+  let add_one (_, layout) = Option.iter (add_layout bv) layout in
+  List.iter add_one vars_layouts
+
 let rec add_type bv ty =
   match Jane_syntax.Core_type.of_ast ty with
   | Some (jty, _attrs) -> add_type_jst bv jty
@@ -133,13 +137,11 @@ and add_type_jst_layouts bv : Jane_syntax.Layouts.core_type -> _ = function
   | Ltyp_var { name = _; layout } ->
     add_layout bv layout
   | Ltyp_poly { bound_vars; inner_type } ->
-    List.iter
-      (fun (_, layout) -> Option.iter (add_layout bv) layout) bound_vars;
+    add_vars_layouts bv bound_vars;
     add_type bv inner_type
   | Ltyp_alias { aliased_type; name = _; layout } ->
     add_type bv aliased_type;
     add_layout bv layout
-
 
 and add_package_type bv (lid, l) =
   add bv lid;
@@ -171,16 +173,19 @@ let add_type_declaration bv td =
   | Ptype_open -> () in
   add_tkind td.ptype_kind
 
-let add_extension_constructor_jst _bv _attrs :
+let add_extension_constructor_jst bv :
   Jane_syntax.Extension_constructor.t -> _ = function
-  | _ -> .
+  | Jext_layout (Lext_decl (vars_layouts, args, res)) ->
+    add_vars_layouts bv vars_layouts;
+    add_constructor_arguments bv args;
+    Option.iter (add_type bv) res
 
 let add_extension_constructor bv ext =
   match Jane_syntax.Extension_constructor.of_ast ext with
-  | Some (jext, attrs) -> add_extension_constructor_jst bv attrs jext
+  | Some (jext, _attrs) -> add_extension_constructor_jst bv jext
   | None ->
   match ext.pext_kind with
-    Pext_decl(_, args, rty, _) ->
+    Pext_decl(_, args, rty) ->
       add_constructor_arguments bv args;
       Option.iter (add_type bv) rty
   | Pext_rebind lid -> add bv lid

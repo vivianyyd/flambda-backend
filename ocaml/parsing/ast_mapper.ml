@@ -146,8 +146,15 @@ module T = struct
     in
     Of.mk ~loc ~attrs desc
 
-  let type_vars_layouts sub (tvls : type_vars_layouts) =
-    List.map (map_opt (map_loc_txt sub sub.layout_annotation)) tvls
+  let map_bound_vars sub bound_vars =
+    let bound_var (name, layout_opt) =
+      let name = map_loc sub name in
+      let layout_opt =
+        map_opt (map_loc_txt sub sub.layout_annotation) layout_opt
+      in
+      (name, layout_opt)
+    in
+    List.map bound_var bound_vars
 
   let map_jst_layouts sub :
         Jane_syntax.Layouts.core_type -> Jane_syntax.Layouts.core_type =
@@ -156,14 +163,7 @@ module T = struct
       let layout = map_loc_txt sub sub.layout_annotation layout in
       Ltyp_var { name; layout }
     | Ltyp_poly { bound_vars; inner_type } ->
-      let bound_var (name, layout_opt) =
-        let name = map_loc sub name in
-        let layout_opt =
-          map_opt (map_loc_txt sub sub.layout_annotation) layout_opt
-        in
-        (name, layout_opt)
-      in
-      let bound_vars = List.map bound_var bound_vars in
+      let bound_vars = map_bound_vars sub bound_vars in
       let inner_type = sub.typ sub inner_type in
       Ltyp_poly { bound_vars; inner_type }
     | Ltyp_alias { aliased_type; name; layout } ->
@@ -260,16 +260,20 @@ module T = struct
     Te.mk_exception ~loc ~attrs
       (sub.extension_constructor sub ptyexn_constructor)
 
-  let map_extension_constructor_jst _sub :
-    Jane_syntax.Extension_constructor.t -> _ = function
-    | _ -> .
+  let map_extension_constructor_jst sub :
+    Jane_syntax.Extension_constructor.t -> Jane_syntax.Extension_constructor.t =
+    function
+    | Jext_layout (Lext_decl(vars, args, res)) ->
+      let vars = map_bound_vars sub vars in
+      let args = map_constructor_arguments sub args in
+      let res = map_opt (sub.typ sub) res in
+      Jext_layout (Lext_decl(vars, args, res))
 
   let map_extension_constructor_kind sub = function
-      Pext_decl(vars, ctl, cto, layouts) ->
+      Pext_decl(vars, ctl, cto) ->
         Pext_decl(List.map (map_loc sub) vars,
                   map_constructor_arguments sub ctl,
-                  map_opt (sub.typ sub) cto,
-                  type_vars_layouts sub layouts)
+                  map_opt (sub.typ sub) cto)
     | Pext_rebind li ->
         Pext_rebind (map_loc sub li)
 
@@ -281,11 +285,11 @@ module T = struct
     let loc = sub.location sub pext_loc in
     let name = map_loc sub pext_name in
     match Jane_syntax.Extension_constructor.of_ast ext with
-    | Some (jext, attrs) -> begin
-      let _attrs = sub.attributes sub attrs in
-      match sub.extension_constructor_jane_syntax sub jext with
-      | _ -> .
-    end
+    | Some (jext, attrs) ->
+      let attrs = sub.attributes sub attrs in
+      let jext = sub.extension_constructor_jane_syntax sub jext in
+      Jane_syntax.Extension_constructor.extension_constructor_of
+        ~loc ~name ~attrs jext
     | None ->
     let attrs = sub.attributes sub pext_attributes in
     Te.constructor ~loc ~attrs

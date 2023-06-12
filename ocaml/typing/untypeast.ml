@@ -294,15 +294,17 @@ let extension_constructor sub ext =
   let loc = sub.location sub ext.ext_loc in
   let add_loc x = mkloc x loc in
   let attrs = sub.attributes sub ext.ext_attributes in
-  Te.constructor ~loc ~attrs
-    (map_loc sub ext.ext_name)
-    (match ext.ext_kind with
-      | Text_decl (vs, args, ret) ->
-          let vs, ls = List.split vs in
-          Pext_decl (List.map add_loc vs, constructor_arguments sub args,
-                     Option.map (sub.typ sub) ret, List.map (Option.map add_loc) ls)
-      | Text_rebind (_p, lid) -> Pext_rebind (map_loc sub lid)
-    )
+  let name = map_loc sub ext.ext_name in
+  match ext.ext_kind with
+  | Text_decl (vs, args, ret) ->
+    let one_var (v, l) = add_loc v, Option.map add_loc l in
+    let vs = List.map one_var vs in
+    let args = constructor_arguments sub args in
+    let ret = Option.map (sub.typ sub) ret in
+    Jane_syntax.Layouts.extension_constructor_of
+      ~loc ~name ~attrs (Lext_decl (vs, args, ret))
+  | Text_rebind (_p, lid) ->
+    Te.constructor ~loc ~attrs name (Pext_rebind (map_loc sub lid))
 
 let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
   let loc = sub.location sub pat.pat_loc in

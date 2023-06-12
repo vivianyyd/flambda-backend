@@ -222,17 +222,19 @@ module T = struct
     sub.attributes sub ptyexn_attributes
 
   let iter_extension_constructor_kind sub = function
-      Pext_decl(vars, ctl, cto, layouts) ->
+      Pext_decl(vars, ctl, cto )->
         List.iter (iter_loc sub) vars;
         iter_constructor_arguments sub ctl;
-        iter_opt (sub.typ sub) cto;
-        type_vars_layouts sub layouts
+        iter_opt (sub.typ sub) cto
     | Pext_rebind li ->
         iter_loc sub li
 
-  let iter_extension_constructor_jst _sub :
+  let iter_extension_constructor_jst sub :
     Jane_syntax.Extension_constructor.t -> _ = function
-    | _ -> .
+    | Jext_layout (Lext_decl (vls, ctl, cto)) ->
+      List.iter (bound_var sub) vls;
+      iter_constructor_arguments sub ctl;
+      iter_opt (sub.typ sub) cto
 
   let iter_extension_constructor sub
      ({pext_name;
