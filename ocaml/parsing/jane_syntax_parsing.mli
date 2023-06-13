@@ -141,7 +141,6 @@ end
     corresponding module of this module type.  We're adding these lazily as we
     need them. When you add another one, make sure also to add special handling
     in [Ast_iterator] and [Ast_mapper].
-
 *)
 module type AST = sig
   (** The AST type (e.g., [Parsetree.expression]) *)

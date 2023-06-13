@@ -516,14 +516,14 @@ module Make_with_attribute
 
     let embedding_syntax = Embedding_syntax.Attribute
 
-    let make_jane_syntax name ?payload ast =
+    let make_jane_syntax name ?(payload = PStr []) ast =
       let attr =
         { attr_name =
             { txt = Embedded_name.to_string name
             ; loc = !Ast_helper.default_loc
             }
         ; attr_loc = !Ast_helper.default_loc
-        ; attr_payload = Option.value payload ~default:(PStr [])
+        ; attr_payload = payload
         }
       in
       with_attributes ast (attr :: attributes ast)
@@ -568,14 +568,14 @@ module Make_with_extension_node
 
     let embedding_syntax = Embedding_syntax.Extension_node
 
-    let make_jane_syntax name ?payload ast =
+    let make_jane_syntax name ?(payload = PStr []) ast =
       make_extension_use
         ast
         ~extension_node:
           (make_extension_node
              ({ txt = Embedded_name.to_string name
               ; loc = !Ast_helper.default_loc },
-              Option.value payload ~default:(PStr [])))
+              payload))
 
     let match_jane_syntax ast =
       match match_extension_use ast with
@@ -590,6 +590,19 @@ module Make_with_extension_node
         | None -> None
         | Some name -> Some (name, ext_loc, ext_payload, body)
 end
+
+(********************************************************)
+(* Modules representing individual syntactic categories *)
+
+(* Note [Hiding internal details]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Each such module is first written with a '0' suffix. These '0'
+   modules are used internally as arguments to [Make_ast] to produce
+   non-'0' modules which are exported. This approach allows us to
+   hide details of these modules necessary for [Make_ast] but
+   unnecessary for external uses.
+*)
 
 (** The AST parameters for every subset of types; embedded with attributes. *)
 module Type_AST_syntactic_category = struct
@@ -750,6 +763,7 @@ module type AST = sig
     of_ast_internal:(Feature.t -> ast -> 'a option) -> (ast -> 'a option)
 end
 
+(* See Note [Hiding internal details] *)
 module Make_ast (AST : AST_internal) : AST with type ast = AST.ast = struct
   include AST
 
@@ -799,6 +813,7 @@ module Make_ast (AST : AST_internal) : AST with type ast = AST.ast = struct
     of_ast
 end
 
+(* See Note [Hiding internal details] *)
 module Expression = Make_ast(Expression0)
 module Pattern = Make_ast(Pattern0)
 module Module_type = Make_ast(Module_type0)

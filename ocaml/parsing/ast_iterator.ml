@@ -91,7 +91,7 @@ let iter_tuple3 f1 f2 f3 (x, y, z) = f1 x; f2 y; f3 z
 let iter_opt f = function None -> () | Some x -> f x
 
 let iter_loc sub {loc; txt = _} = sub.location sub loc
-let iter_loc2 sub f { loc; txt } =
+let iter_loc_txt sub f { loc; txt } =
   sub.location sub loc;
   f sub txt
 
@@ -121,7 +121,7 @@ module T = struct
     | Oinherit t -> sub.typ sub t
 
   let layout_annotation sub =
-    iter_loc2 sub sub.layout_annotation
+    iter_loc_txt sub sub.layout_annotation
 
   let type_vars_layouts sub (tvls : type_vars_layouts) =
     List.iter (iter_opt (layout_annotation sub)) tvls
@@ -132,13 +132,13 @@ module T = struct
 
   let iter_jst_layout sub : Jane_syntax.Layouts.core_type -> _ = function
     | Ltyp_var { name = _; layout } ->
-      iter_loc2 sub sub.layout_annotation layout
+      iter_loc_txt sub sub.layout_annotation layout
     | Ltyp_poly { bound_vars; inner_type } ->
       List.iter (bound_var sub) bound_vars;
       sub.typ sub inner_type
     | Ltyp_alias { aliased_type; name = _; layout } ->
       sub.typ sub aliased_type;
-      iter_loc2 sub sub.layout_annotation layout
+      iter_loc_txt sub sub.layout_annotation layout
 
   let iter_jst sub : Jane_syntax.Core_type.t -> _ = function
     | Jtyp_layout typ -> iter_jst_layout sub typ
@@ -542,7 +542,7 @@ module E = struct
         sub.expr sub e; iter_opt (sub.typ sub) t
     | Pexp_object cls -> sub.class_structure sub cls
     | Pexp_newtype (_s, e, l) ->
-        iter_opt (iter_loc2 sub sub.layout_annotation) l;
+        iter_opt (iter_loc_txt sub sub.layout_annotation) l;
         sub.expr sub e
     | Pexp_pack me -> sub.module_expr sub me
     | Pexp_open (o, e) ->
