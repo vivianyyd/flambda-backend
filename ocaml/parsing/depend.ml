@@ -236,7 +236,7 @@ let rec add_pattern bv pat =
 and add_pattern_jane_syntax bv : Jane_syntax.Pattern.t -> _ = function
   | Jpat_immutable_array (Iapat_immutable_array pl) ->
       List.iter (add_pattern bv) pl
-  | Jpat_unboxed_constant _ -> add_constant
+  | Jpat_layout (Lpat_constant _) -> add_constant
 
 let add_pattern bv pat =
   pattern_bv := bv;
@@ -322,7 +322,7 @@ let rec add_expr bv exp =
 and add_expr_jane_syntax bv : Jane_syntax.Expression.t -> _ = function
   | Jexp_comprehension x -> add_comprehension_expr bv x
   | Jexp_immutable_array x -> add_immutable_array_expr bv x
-  | Jexp_unboxed_constant _ -> add_constant
+  | Jexp_layout (Lexp_constant _) -> add_constant
 
 and add_comprehension_expr bv : Jane_syntax.Comprehensions.expression -> _ =
   function

@@ -575,7 +575,7 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
         match Jane_syntax.Pattern.of_ast p with
         | Some (jpat, _attrs) -> begin match jpat with
         | Jpat_immutable_array (Iapat_immutable_array _) -> false
-        | Jpat_unboxed_constant _ -> false
+        | Jpat_layout (Lpat_constant _) -> false
         end
         | None -> match p.ppat_desc with
         | Ppat_array _ | Ppat_record _
@@ -593,7 +593,7 @@ and pattern_jane_syntax ctxt attrs f (pat : Jane_syntax.Pattern.t) =
     match pat with
     | Jpat_immutable_array (Iapat_immutable_array l) ->
         pp f "@[<2>[:%a:]@]"  (list (pattern1 ctxt) ~sep:";") l
-    | Jpat_unboxed_constant c -> unboxed_constant ctxt f c
+    | Jpat_layout (Lpat_constant c) -> unboxed_constant ctxt f c
 
 and maybe_local_pat ctxt is_local f p =
   if is_local then
@@ -1880,7 +1880,7 @@ and jane_syntax_expr ctxt attrs f (jexp : Jane_syntax.Expression.t) =
   else match jexp with
   | Jexp_comprehension x    -> comprehension_expr ctxt f x
   | Jexp_immutable_array x  -> immutable_array_expr ctxt f x
-  | Jexp_unboxed_constant x -> unboxed_constant ctxt f x
+  | Jexp_layout (Lexp_constant x) -> unboxed_constant ctxt f x
 
 and comprehension_expr ctxt f (cexp : Jane_syntax.Comprehensions.expression) =
   let punct, comp = match cexp with
@@ -1933,7 +1933,7 @@ and immutable_array_expr ctxt f (x : Jane_syntax.Immutable_arrays.expression) =
       pp f "@[<0>@[<2>[:%a:]@]@]"
          (list (simple_expr (under_semi ctxt)) ~sep:";") elts
 
-and unboxed_constant _ctxt f (x : Jane_syntax.Unboxed_constants.t)
+and unboxed_constant _ctxt f (x : Jane_syntax.Layouts.constant)
   =
   match x with
   | Float (x, suffix) -> pp f "#%a" constant (Pconst_float (x, suffix))

@@ -110,26 +110,19 @@ module Strengthen : sig
     module_type -> Parsetree.module_type
 end
 
-(** The ASTs for unboxed literals, like #4.0 *)
-module Unboxed_constants : sig
-  type t =
+(** The ASTs for layouts and other unboxed-types features *)
+module Layouts : sig
+  type constant =
     | Float of string * char option
     | Integer of string * char
 
-  type expression = t
-  type pattern = t
+  type nonrec expression =
+    | Lexp_constant of constant
 
-  val expr_of :
-    loc:Location.t -> attrs:Parsetree.attributes ->
-    expression -> Parsetree.expression
+  type nonrec pattern =
+    | Lpat_constant of constant
 
-  val pat_of :
-    loc:Location.t -> attrs:Parsetree.attributes ->
-    pattern -> Parsetree.pattern
-end
 
-(** The ASTs for layouts. *)
-module Layouts : sig
   type nonrec core_type =
     (* ['a : immediate] or [_ : float64] *)
     | Ltyp_var of { name : string option
@@ -145,16 +138,24 @@ module Layouts : sig
                     ; name : string option
                     ; layout : Asttypes.layout_annotation }
 
-  val type_of :
-    loc:Location.t -> attrs:Parsetree.attributes ->
-    core_type -> Parsetree.core_type
-
   type nonrec extension_constructor =
     (* [ 'a ('b : immediate) ('c : float64). 'a * 'b * 'c -> exception ] *)
     | Lext_decl of (string Location.loc *
                     Asttypes.layout_annotation option) list *
                    Parsetree.constructor_arguments *
                    Parsetree.core_type option
+
+  val expr_of :
+    loc:Location.t -> attrs:Parsetree.attributes ->
+    expression -> Parsetree.expression
+
+  val pat_of :
+    loc:Location.t -> attrs:Parsetree.attributes ->
+    pattern -> Parsetree.pattern
+
+  val type_of :
+    loc:Location.t -> attrs:Parsetree.attributes ->
+    core_type -> Parsetree.core_type
 
   val extension_constructor_of :
     loc:Location.t ->
@@ -265,9 +266,9 @@ end
 (** Novel syntax in expressions *)
 module Expression : sig
   type t =
-    | Jexp_comprehension    of Comprehensions.expression
-    | Jexp_immutable_array  of Immutable_arrays.expression
-    | Jexp_unboxed_constant of Unboxed_constants.expression
+    | Jexp_comprehension of Comprehensions.expression
+    | Jexp_immutable_array of Immutable_arrays.expression
+    | Jexp_layout of Layouts.expression
 
   include AST
     with type t := t * Parsetree.attributes
@@ -281,7 +282,7 @@ end
 module Pattern : sig
   type t =
     | Jpat_immutable_array of Immutable_arrays.pattern
-    | Jpat_unboxed_constant of Unboxed_constants.pattern
+    | Jpat_layout of Layouts.pattern
 
   include AST
     with type t := t * Parsetree.attributes

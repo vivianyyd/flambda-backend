@@ -470,7 +470,7 @@ module E = struct
   let iter_jst sub : Jane_syntax.Expression.t -> _ = function
     | Jexp_comprehension comp_exp -> iter_comp_exp sub comp_exp
     | Jexp_immutable_array iarr_exp -> iter_iarr_exp sub iarr_exp
-    | Jexp_unboxed_constant _ -> iter_constant
+    | Jexp_layout (Lexp_constant _) -> iter_constant
 
   let iter sub
         ({pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} as expr)=
@@ -575,7 +575,7 @@ module P = struct
 
   let iter_jst sub : Jane_syntax.Pattern.t -> _ = function
     | Jpat_immutable_array iapat -> iter_iapat sub iapat
-    | Jpat_unboxed_constant _ -> iter_constant
+    | Jpat_layout (Lpat_constant _) -> iter_constant
 
   let iter sub
         ({ppat_desc = desc; ppat_loc = loc; ppat_attributes = attrs} as pat) =

@@ -514,7 +514,7 @@ module E = struct
 
   module C = Jane_syntax.Comprehensions
   module IA = Jane_syntax.Immutable_arrays
-  module UC = Jane_syntax.Unboxed_constants
+  module L = Jane_syntax.Layouts
 
   let map_iterator sub : C.iterator -> C.iterator = function
     | Range { start; stop; direction } ->
@@ -547,18 +547,18 @@ module E = struct
     | Iaexp_immutable_array elts ->
       Iaexp_immutable_array (List.map (sub.expr sub) elts)
 
-  let map_unboxed_constant_exp _sub : UC.expression -> UC.expression = function
+  let map_unboxed_constant_exp _sub : L.constant -> L.constant = function
     (* We can't reasonably call [sub.constant] because it might return a kind
        of constant we don't know how to unbox.
     *)
-    | Float _ | Integer _ as x -> x
+    | (Float _ | Integer _) as x -> x
 
   let map_jst sub : Jane_syntax.Expression.t -> Jane_syntax.Expression.t =
     function
     | Jexp_comprehension x -> Jexp_comprehension (map_cexp sub x)
     | Jexp_immutable_array x -> Jexp_immutable_array (map_iaexp sub x)
-    | Jexp_unboxed_constant x ->
-        Jexp_unboxed_constant (map_unboxed_constant_exp sub x)
+    | Jexp_layout (Lexp_constant x) ->
+        Jexp_layout (Lexp_constant (map_unboxed_constant_exp sub x))
 
   let map sub
         ({pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} as exp) =
@@ -662,13 +662,13 @@ module P = struct
   (* Patterns *)
 
   module IA = Jane_syntax.Immutable_arrays
-  module UC = Jane_syntax.Unboxed_constants
+  module L = Jane_syntax.Layouts
 
   let map_iapat sub : IA.pattern -> IA.pattern = function
     | Iapat_immutable_array elts ->
       Iapat_immutable_array (List.map (sub.pat sub) elts)
 
-  let map_unboxed_constant_pat _sub : UC.pattern -> UC.pattern = function
+  let map_unboxed_constant_pat _sub : L.constant -> L.constant = function
     (* We can't reasonably call [sub.constant] because it might return a kind
        of constant we don't know how to unbox.
     *)
@@ -676,8 +676,8 @@ module P = struct
 
   let map_jst sub : Jane_syntax.Pattern.t -> Jane_syntax.Pattern.t = function
     | Jpat_immutable_array x -> Jpat_immutable_array (map_iapat sub x)
-    | Jpat_unboxed_constant x ->
-        Jpat_unboxed_constant (map_unboxed_constant_pat sub x)
+    | Jpat_layout (Lpat_constant x) ->
+        Jpat_layout (Lpat_constant (map_unboxed_constant_pat sub x))
 
   let map sub
         ({ppat_desc = desc; ppat_loc = loc; ppat_attributes = attrs} as pat) =

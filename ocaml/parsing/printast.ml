@@ -1019,3 +1019,4 @@ let implementation ppf x = list 0 structure_item ppf x;;
 
 let top_phrase ppf x = toplevel_phrase 0 ppf x;;
 
+let constant = fmt_constant;;

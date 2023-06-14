@@ -474,7 +474,7 @@ let type_constant = function
   | Const_nativeint _ -> instance Predef.type_nativeint
 
 let type_constant_unboxed env loc
-    : Jane_syntax.Unboxed_constants.expression -> _ = function
+    : Jane_syntax.Layouts.constant -> _ = function
   | Float _ -> instance Predef.type_float_unboxed
   | Integer _ -> raise (Error (loc, env, Unboxed_int_literals_not_supported))
 
@@ -516,7 +516,7 @@ let constant_or_raise env loc cst =
   | Error err -> raise (Error (loc, env, err))
 
 let unboxed_constant :
-    type a. Jane_syntax.Unboxed_constants.expression -> (a, error) result
+    type a. Jane_syntax.Layouts.constant -> (a, error) result
   = function
   | Float (_, None) -> Error Unboxed_float_literals_not_supported
   | Float (x, Some c) -> Error (Unknown_literal ("#" ^ x, c))
@@ -1927,7 +1927,7 @@ let rec has_literal_pattern p =
 and has_literal_pattern_jane_syntax : Jane_syntax.Pattern.t -> _ = function
   | Jpat_immutable_array (Iapat_immutable_array ps) ->
      List.exists has_literal_pattern ps
-  | Jpat_unboxed_constant _ -> true
+  | Jpat_layout (Lpat_constant _) -> true
 
 let check_scope_escape loc env level ty =
   try Ctype.check_scope_escape env level ty
@@ -2242,7 +2242,7 @@ and type_pat_aux
       match jpat with
       | Jpat_immutable_array (Iapat_immutable_array spl) ->
           type_pat_array Immutable spl attrs
-      | Jpat_unboxed_constant cst ->
+      | Jpat_layout (Lpat_constant cst) ->
           let desc = unboxed_constant_or_raise !env loc cst in
           rvp k @@ solve_expected {
             pat_desc = desc;
@@ -2897,7 +2897,7 @@ let rec pat_tuple_arity spat =
   | Ppat_constraint(p, _) | Ppat_open(_, p) | Ppat_alias(p, _) -> pat_tuple_arity p
 and pat_tuple_arity_jane_syntax : Jane_syntax.Pattern.t -> _ = function
   | Jpat_immutable_array (Iapat_immutable_array _) -> Not_local_tuple
-  | Jpat_unboxed_constant _ -> Not_local_tuple
+  | Jpat_layout (Lpat_constant _) -> Not_local_tuple
 
 let rec cases_tuple_arity cases =
   match cases with
@@ -3433,7 +3433,7 @@ let is_local_returning_expr e =
         match jexp with
         | Jexp_comprehension   _ -> false, e.pexp_loc
         | Jexp_immutable_array _ -> false, e.pexp_loc
-        | Jexp_unboxed_constant _ -> false, e.pexp_loc
+        | Jexp_layout (Lexp_constant _) -> false, e.pexp_loc
       end
     | None      ->
     match e.pexp_desc with
@@ -3570,7 +3570,7 @@ and approx_type_jst _env _attrs : Jane_syntax.Core_type.t -> _ = function
 
 let type_pattern_approx_jane_syntax : Jane_syntax.Pattern.t -> _ = function
   | Jpat_immutable_array _
-  | Jpat_unboxed_constant _ -> ()
+  | Jpat_layout (Lpat_constant _) -> ()
 
 let type_pattern_approx env spat ty_expected =
   match Jane_syntax.Pattern.of_ast spat with
@@ -3685,7 +3685,7 @@ and type_approx_aux env sexp in_function ty_expected =
 and type_approx_aux_jane_syntax : Jane_syntax.Expression.t -> _ = function
   | Jexp_comprehension _
   | Jexp_immutable_array _
-  | Jexp_unboxed_constant _ -> ()
+  | Jexp_layout (Lexp_constant _) -> ()
 
 let type_approx env sexp ty =
   type_approx_aux env sexp None ty
@@ -3900,7 +3900,7 @@ let contains_variant_either ty =
 
 let shallow_iter_ppat_jane_syntax f : Jane_syntax.Pattern.t -> _ = function
   | Jpat_immutable_array (Iapat_immutable_array pats) -> List.iter f pats
-  | Jpat_unboxed_constant _ -> ()
+  | Jpat_layout (Lpat_constant _) -> ()
 
 let shallow_iter_ppat f p =
   match Jane_syntax.Pattern.of_ast p with
@@ -4052,7 +4052,7 @@ let rec is_inferred sexp =
 and is_inferred_jane_syntax : Jane_syntax.Expression.t -> _ = function
   | Jexp_comprehension _
   | Jexp_immutable_array _
-  | Jexp_unboxed_constant _ -> false
+  | Jexp_layout (Lexp_constant _) -> false
 
 (* check if the type of %apply or %revapply matches the type expected by
    the specialized typing rule for those primitives.
@@ -6927,7 +6927,7 @@ and type_let
   and jexp_is_fun : Jane_syntax.Expression.t -> _ = function
     | Jexp_comprehension _
     | Jexp_immutable_array _
-    | Jexp_unboxed_constant _ -> false
+    | Jexp_layout (Lexp_constant _) -> false
   in
   let vb_is_fun { pvb_expr = sexp; _ } = sexp_is_fun sexp in
   let entirely_functions = List.for_all vb_is_fun spat_sexp_list in
@@ -7326,7 +7326,7 @@ and type_expect_jane_syntax
   | Jexp_immutable_array x ->
       type_immutable_array
         ~loc ~env ~expected_mode ~ty_expected ~explanation ~attributes x
-  | Jexp_unboxed_constant x ->
+  | Jexp_layout (Lexp_constant x) ->
       type_unboxed_constant
         ~loc ~env ~expected_mode ~ty_expected ~explanation ~attributes x
 

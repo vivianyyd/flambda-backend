@@ -774,27 +774,24 @@ let check_layout ~loc id : const_layout =
 
 (* Unboxed literals *)
 
-(* CR layouts v2: The [unboxed_*] functions will both be improved and lose
-   their explicit assert once we have real unboxed literals in Jane syntax; they
-   may also get re-inlined at that point *)
 let unboxed_literals_extension = Language_extension.Layouts
 
 module Constant : sig
   type t = private
     | Value of constant
-    | Unboxed of Jane_syntax.Unboxed_constants.t
+    | Unboxed of Jane_syntax.Layouts.constant
 
   type loc := Lexing.position * Lexing.position
 
   val value : Parsetree.constant -> t
-  val unboxed : loc:loc -> Jane_syntax.Unboxed_constants.t -> t
+  val unboxed : loc:loc -> Jane_syntax.Layouts.constant -> t
   val to_expression : loc:loc -> t -> expression
   val to_pattern : loc:loc -> t -> pattern
   val assert_is_value : loc:loc -> where:string -> t -> constant
 end = struct
   type t =
     | Value of constant
-    | Unboxed of Jane_syntax.Unboxed_constants.t
+    | Unboxed of Jane_syntax.Layouts.constant
 
   let value x = Value x
 
@@ -810,15 +807,15 @@ end = struct
     | Value const_value ->
         mkexp ~loc (Pexp_constant const_value)
     | Unboxed const_unboxed ->
-      Jane_syntax.Unboxed_constants.expr_of
-        ~loc:(make_loc loc) ~attrs:[] const_unboxed
+      Jane_syntax.Layouts.expr_of
+        ~loc:(make_loc loc) ~attrs:[] (Lexp_constant const_unboxed)
 
   let to_pattern ~loc : t -> pattern = function
     | Value const_value ->
         mkpat ~loc (Ppat_constant const_value)
     | Unboxed const_unboxed ->
-      Jane_syntax.Unboxed_constants.pat_of
-        ~loc:(make_loc loc) ~attrs:[] const_unboxed
+      Jane_syntax.Layouts.pat_of
+        ~loc:(make_loc loc) ~attrs:[] (Lpat_constant const_unboxed)
 
   let assert_is_value ~loc ~where : t -> Parsetree.constant = function
     | Value x -> x

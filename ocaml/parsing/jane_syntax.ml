@@ -428,57 +428,6 @@ module Strengthen = struct
     | _ -> failwith "Malformed strengthened module type"
 end
 
-module Unboxed_constants = struct
-  type t =
-    | Float of string * char option
-    | Integer of string * char
-
-  type expression = t
-  type pattern = t
-
-  let feature : Feature.t = Language_extension Layouts
-
-  let fail_malformed ~loc =
-    Location.raise_errorf ~loc "Malformed unboxed numeric literal"
-
-  let of_constant ~loc = function
-    | Pconst_float (x, suffix) -> Float (x, suffix)
-    | Pconst_integer (x, Some suffix) -> Integer (x, suffix)
-    | Pconst_integer (_, None) ->
-        Location.raise_errorf ~loc
-          "Malformed unboxed int literal: suffix required"
-    | _ -> fail_malformed ~loc
-
-
-  (* Returns remaining unconsumed attributes *)
-  let of_expr expr =
-    let loc = expr.pexp_loc in
-    match expr.pexp_desc with
-    | Pexp_constant const -> of_constant ~loc const, expr.pexp_attributes
-    | _ -> fail_malformed ~loc
-
-  (* Returns remaining unconsumed attributes *)
-  let of_pat pat =
-    let loc = pat.ppat_loc in
-    match pat.ppat_desc with
-    | Ppat_constant const -> of_constant ~loc const, pat.ppat_attributes
-    | _ -> fail_malformed ~loc
-
-  let constant_of = function
-    | Float (x, suffix) -> Pconst_float (x, suffix)
-    | Integer (x, suffix) -> Pconst_integer (x, Some suffix)
-
-  let expr_of ~loc ~attrs t =
-    let constant = constant_of t in
-    Expression.make_entire_jane_syntax ~loc feature (fun () ->
-      Ast_helper.Exp.constant ~attrs constant)
-
-  let pat_of ~loc ~attrs t =
-    let constant = constant_of t in
-    Pattern.make_entire_jane_syntax ~loc feature (fun () ->
-      Ast_helper.Pat.constant ~attrs constant)
-end
-
 (** Layouts *)
 module Layouts = struct
   module Ext = struct
@@ -487,6 +436,16 @@ module Layouts = struct
   end
 
   include Ext
+
+  type constant =
+    | Float of string * char option
+    | Integer of string * char
+
+  type nonrec expression =
+    | Lexp_constant of constant
+
+  type nonrec pattern =
+    | Lpat_constant of constant
 
   type nonrec core_type =
     | Ltyp_var of { name : string option
@@ -513,36 +472,55 @@ module Layouts = struct
       | Unexpected_wrapped_ext of Parsetree.extension_constructor
       | Unexpected_attribute of string list
       | Wrong_number_of_layouts of int * layout_annotation option list
+      | No_integer_suffix
+      | Unexpected_constant of Parsetree.constant
+      | Unexpected_wrapped_expr of Parsetree.expression
+      | Unexpected_wrapped_pat of Parsetree.pattern
 
     let report_error ~loc = function
       | Not_a_layout payload ->
-          Location.errorf ~loc
-            "Layout attribute does not name a layout:@;%a"
-            (Printast.payload 0) payload
+        Location.errorf ~loc
+          "Layout attribute does not name a layout:@;%a"
+          (Printast.payload 0) payload
       | Unexpected_wrapped_type typ ->
-          Location.errorf ~loc
-            "Layout attribute on wrong core type:@;%a"
-            (Printast.core_type 0) typ
+        Location.errorf ~loc
+          "Layout attribute on wrong core type:@;%a"
+          (Printast.core_type 0) typ
       | Unexpected_wrapped_ext ext ->
-          Location.errorf ~loc
-            "Layout attribute on wrong extension constructor:@;%a"
-            (Printast.extension_constructor 0) ext
+        Location.errorf ~loc
+          "Layout attribute on wrong extension constructor:@;%a"
+          (Printast.extension_constructor 0) ext
       | Unexpected_attribute names ->
-          Location.errorf ~loc
-            "Layout extension does not understand these attribute names:@;[%a]"
-            (Format.pp_print_list
-               ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
-               Format.pp_print_text) names
+        Location.errorf ~loc
+          "Layout extension does not understand these attribute names:@;[%a]"
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+             Format.pp_print_text) names
       | Wrong_number_of_layouts (n, layouts) ->
-          Location.errorf ~loc
-            "Wrong number of layouts in an layout attribute;@;\
-             expecting %i but got this list:@;%a"
-            n
-            (Format.pp_print_list
-               (Format.pp_print_option
-                  ~none:(fun ppf () -> Format.fprintf ppf "None")
-                  (Printast.layout_annotation 0)))
-            layouts
+        Location.errorf ~loc
+          "Wrong number of layouts in an layout attribute;@;\
+           expecting %i but got this list:@;%a"
+          n
+          (Format.pp_print_list
+             (Format.pp_print_option
+                ~none:(fun ppf () -> Format.fprintf ppf "None")
+                (Printast.layout_annotation 0)))
+          layouts
+      | No_integer_suffix ->
+        Location.errorf ~loc
+          "All unboxed integers require a suffix to determine their size."
+      | Unexpected_constant c ->
+        Location.errorf ~loc
+          "Unexpected unboxed constant:@ %a"
+          (Printast.constant) c
+      | Unexpected_wrapped_expr expr ->
+        Location.errorf ~loc
+          "Layout attribute on wrong expression:@;%a"
+          (Printast.expression 0) expr
+      | Unexpected_wrapped_pat pat ->
+        Location.errorf ~loc
+          "Layout attribute on wrong pattern:@;%a"
+          (Printast.pattern 0) pat
 
     exception Error of Location.t * error
 
@@ -658,6 +636,64 @@ module Layouts = struct
         Desugaring_error.raise ~loc
           (Wrong_number_of_layouts(List.length var_names, layouts))
   end
+
+  (*******************************************************)
+  (* Constants *)
+
+  let constant_of = function
+    | Float (x, suffix) -> Pconst_float (x, suffix)
+    | Integer (x, suffix) -> Pconst_integer (x, Some suffix)
+
+  let of_constant ~loc = function
+    | Pconst_float (x, suffix) -> Float (x, suffix)
+    | Pconst_integer (x, Some suffix) -> Integer (x, suffix)
+    | Pconst_integer (_, None) ->
+      Desugaring_error.raise ~loc No_integer_suffix
+    | const -> Desugaring_error.raise ~loc (Unexpected_constant const)
+
+  (*******************************************************)
+  (* Encoding expressions *)
+
+  let expr_of ~loc ~attrs t =
+    Expression.make_entire_jane_syntax ~loc feature begin fun () ->
+      match t with
+      | Lexp_constant c ->
+        let constant = constant_of c in
+        Ast_helper.Exp.constant ~attrs constant
+    end
+
+  (*******************************************************)
+  (* Desugaring expressions *)
+
+  let of_expr expr =
+    let loc = expr.pexp_loc in
+    let lexp = match expr.pexp_desc with
+      | Pexp_constant const -> Lexp_constant (of_constant ~loc const)
+      | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_expr expr)
+    in
+    lexp, expr.pexp_attributes
+
+  (*******************************************************)
+  (* Encoding patterns *)
+
+  let pat_of ~loc ~attrs t =
+    Pattern.make_entire_jane_syntax ~loc feature begin fun () ->
+      match t with
+      | Lpat_constant c ->
+        let constant = constant_of c in
+        Ast_helper.Pat.constant ~attrs constant
+    end
+
+  (*******************************************************)
+  (* Desugaring patterns *)
+
+  let of_pat pat =
+    let loc = pat.ppat_loc in
+    let lpat = match pat.ppat_desc with
+      | Ppat_constant const -> Lpat_constant (of_constant ~loc const)
+      | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_pat pat)
+    in
+    lpat, pat.ppat_attributes
 
   (*******************************************************)
   (* Encoding types *)
@@ -840,9 +876,9 @@ end
 
 module Expression = struct
   type t =
-    | Jexp_comprehension   of Comprehensions.expression
+    | Jexp_comprehension of Comprehensions.expression
     | Jexp_immutable_array of Immutable_arrays.expression
-    | Jexp_unboxed_constant of Unboxed_constants.expression
+    | Jexp_layout of Layouts.expression
 
   let of_ast_internal (feat : Feature.t) expr = match feat with
     | Language_extension Comprehensions ->
@@ -852,37 +888,37 @@ module Expression = struct
       let expr, attrs = Immutable_arrays.of_expr expr in
       Some (Jexp_immutable_array expr, attrs)
     | Language_extension Layouts ->
-      let expr, attrs = Unboxed_constants.of_expr expr in
-      Some (Jexp_unboxed_constant expr, attrs)
+      let expr, attrs = Layouts.of_expr expr in
+      Some (Jexp_layout expr, attrs)
     | _ -> None
 
   let of_ast = Expression.make_of_ast ~of_ast_internal
 
   let expr_of ~loc ~attrs = function
-    | Jexp_comprehension    x -> Comprehensions.expr_of    ~loc ~attrs x
-    | Jexp_immutable_array  x -> Immutable_arrays.expr_of  ~loc ~attrs x
-    | Jexp_unboxed_constant x -> Unboxed_constants.expr_of ~loc ~attrs x
+    | Jexp_comprehension x -> Comprehensions.expr_of ~loc ~attrs x
+    | Jexp_immutable_array x -> Immutable_arrays.expr_of ~loc ~attrs x
+    | Jexp_layout x -> Layouts.expr_of ~loc ~attrs x
 end
 
 module Pattern = struct
   type t =
     | Jpat_immutable_array of Immutable_arrays.pattern
-    | Jpat_unboxed_constant of Unboxed_constants.pattern
+    | Jpat_layout of Layouts.pattern
 
   let of_ast_internal (feat : Feature.t) pat = match feat with
     | Language_extension Immutable_arrays ->
       let expr, attrs = Immutable_arrays.of_pat pat in
       Some (Jpat_immutable_array expr, attrs)
     | Language_extension Layouts ->
-      let pat, attrs = Unboxed_constants.of_pat pat in
-      Some (Jpat_unboxed_constant pat, attrs)
+      let pat, attrs = Layouts.of_pat pat in
+      Some (Jpat_layout pat, attrs)
     | _ -> None
 
   let of_ast = Pattern.make_of_ast ~of_ast_internal
 
   let pat_of ~loc ~attrs = function
     | Jpat_immutable_array x -> Immutable_arrays.pat_of ~loc ~attrs x
-    | Jpat_unboxed_constant x -> Unboxed_constants.pat_of ~loc ~attrs x
+    | Jpat_layout x -> Layouts.pat_of ~loc ~attrs x
 end
 
 module Module_type = struct
