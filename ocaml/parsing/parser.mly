@@ -534,10 +534,14 @@ let pat_of_label lbl =
   Pat.mk ~loc:lbl.loc  (Ppat_var (loc_last lbl))
 
 let mk_newtypes ~loc newtypes exp =
-  let mkexp = mkexp ~loc in
-  List.fold_right (fun (name, layout) exp ->
-                   mkexp (Pexp_newtype (name, exp, layout)))
-    newtypes exp
+  let mk_one (name, layout) exp =
+    match layout with
+    | None -> mkexp ~loc (Pexp_newtype (name, exp))
+    | Some layout ->
+      Jane_syntax.Layouts.expr_of ~loc:(make_loc loc) ~attrs:[]
+        (Lexp_newtype (name, layout, exp))
+  in
+  List.fold_right mk_one newtypes exp
 
 let wrap_type_annotation ~loc newtypes core_type body =
   let mk_newtypes = mk_newtypes ~loc in

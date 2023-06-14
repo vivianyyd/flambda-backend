@@ -398,28 +398,29 @@ module Layout = struct
     | Value -> fresh_layout (Sort Sort.value) ~why
     | Void -> fresh_layout (Sort Sort.void) ~why
 
-  let of_annotation ?(skip_check=false) ~context Location.{ loc; txt = const } =
-    begin
-      if not skip_check
-      then let required_layouts_level = get_required_layouts_level context const in
-           if not (Language_extension.is_at_least Layouts required_layouts_level)
-           then raise ~loc (Insufficient_level (context, const))
+  let of_annotation ?(legacy_immediate=false) ~context Location.{ loc; txt = const } =
+    begin match const with
+    | Immediate | Immediate64 | Value when legacy_immediate -> ()
+    | _ ->
+      let required_layouts_level = get_required_layouts_level context const in
+      if not (Language_extension.is_at_least Layouts required_layouts_level)
+      then raise ~loc (Insufficient_level (context, const))
     end;
     of_const ~why:(Annotated (context, loc)) const
 
-  let of_annotation_option ?skip_check ~context =
-    Option.map (of_annotation ?skip_check ~context)
+  let of_annotation_option ?legacy_immediate ~context =
+    Option.map (of_annotation ?legacy_immediate ~context)
 
-  let of_annotation_option_default ?skip_check ~default ~context =
-    Option.fold ~none:default ~some:(of_annotation ?skip_check ~context)
+  let of_annotation_option_default ?legacy_immediate ~default ~context =
+    Option.fold ~none:default ~some:(of_annotation ?legacy_immediate ~context)
 
   let of_attributes ~legacy_immediate ~context attrs =
     Builtin_attributes.layout ~legacy_immediate attrs |>
-    Result.map (of_annotation_option ~skip_check:legacy_immediate ~context)
+    Result.map (of_annotation_option ~legacy_immediate ~context)
 
   let of_attributes_default ~legacy_immediate ~context ~default attrs =
     Builtin_attributes.layout ~legacy_immediate attrs |>
-    Result.map (of_annotation_option_default ~skip_check:legacy_immediate ~default ~context)
+    Result.map (of_annotation_option_default ~legacy_immediate ~default ~context)
 
   let for_boxed_record ~all_void =
     if all_void then immediate ~why:Empty_record else value ~why:Boxed_record

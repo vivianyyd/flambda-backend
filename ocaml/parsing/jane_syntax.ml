@@ -443,6 +443,7 @@ module Layouts = struct
 
   type nonrec expression =
     | Lexp_constant of constant
+    | Lexp_newtype of string loc * layout_annotation * expression
 
   type nonrec pattern =
     | Lpat_constant of constant
@@ -654,24 +655,46 @@ module Layouts = struct
   (*******************************************************)
   (* Encoding expressions *)
 
-  let expr_of ~loc ~attrs t =
+  let expr_of ~loc ~attrs expr =
+    let module Ast_of = Ast_of (Expression) (Ext) in
+    (* See Note [Wrapping with make_entire_jane_syntax] *)
     Expression.make_entire_jane_syntax ~loc feature begin fun () ->
-      match t with
+      match expr with
       | Lexp_constant c ->
         let constant = constant_of c in
+        Ast_of.wrap_jane_syntax ["unboxed"] @@
         Ast_helper.Exp.constant ~attrs constant
+      | Lexp_newtype (name, layout, inner_expr) ->
+        let payload = Encode.as_payload layout in
+        Ast_of.wrap_jane_syntax ["newtype"] ~payload @@
+        Ast_helper.Exp.newtype ~attrs name inner_expr
     end
 
   (*******************************************************)
   (* Desugaring expressions *)
 
   let of_expr expr =
+    let module Of_ast = Of_ast (Ext) in
     let loc = expr.pexp_loc in
-    let lexp = match expr.pexp_desc with
-      | Pexp_constant const -> Lexp_constant (of_constant ~loc const)
-      | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_expr expr)
+    let names, payload, attributes =
+      Of_ast.unwrap_jane_syntax_attributes ~loc expr.pexp_attributes
     in
-    lexp, expr.pexp_attributes
+    let lexpr = match names with
+      | [ "unboxed" ] ->
+        begin match expr.pexp_desc with
+        | Pexp_constant const -> Lexp_constant (of_constant ~loc const)
+        | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_expr expr)
+        end
+      | [ "newtype" ] ->
+        let layout = Decode.from_payload ~loc payload in
+        begin match expr.pexp_desc with
+        | Pexp_newtype (name, inner_expr) ->
+          Lexp_newtype (name, layout, inner_expr)
+        | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_expr expr)
+        end
+      | _ -> Desugaring_error.raise ~loc (Unexpected_attribute names)
+    in
+    lexpr, attributes
 
   (*******************************************************)
   (* Encoding patterns *)

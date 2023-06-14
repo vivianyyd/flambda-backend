@@ -553,12 +553,19 @@ module E = struct
     *)
     | (Float _ | Integer _) as x -> x
 
+  let map_layout_exp sub : L.expression -> L.expression = function
+    | Lexp_constant x -> Lexp_constant (map_unboxed_constant_exp sub x)
+    | Lexp_newtype (str, layout, inner_expr) ->
+      let str = map_loc sub str in
+      let layout = map_loc_txt sub sub.layout_annotation layout in
+      let inner_expr = sub.expr sub inner_expr in
+      Lexp_newtype (str, layout, inner_expr)
+
   let map_jst sub : Jane_syntax.Expression.t -> Jane_syntax.Expression.t =
     function
     | Jexp_comprehension x -> Jexp_comprehension (map_cexp sub x)
     | Jexp_immutable_array x -> Jexp_immutable_array (map_iaexp sub x)
-    | Jexp_layout (Lexp_constant x) ->
-        Jexp_layout (Lexp_constant (map_unboxed_constant_exp sub x))
+    | Jexp_layout x -> Jexp_layout (map_layout_exp sub x)
 
   let map sub
         ({pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} as exp) =
@@ -636,9 +643,8 @@ module E = struct
     | Pexp_poly (e, t) ->
         poly ~loc ~attrs (sub.expr sub e) (map_opt (sub.typ sub) t)
     | Pexp_object cls -> object_ ~loc ~attrs (sub.class_structure sub cls)
-    | Pexp_newtype (s, e, l) ->
+    | Pexp_newtype (s, e) ->
         newtype ~loc ~attrs (map_loc sub s) (sub.expr sub e)
-          (map_opt (map_loc_txt sub sub.layout_annotation) l)
     | Pexp_pack me -> pack ~loc ~attrs (sub.module_expr sub me)
     | Pexp_open (o, e) ->
         open_ ~loc ~attrs (sub.open_declaration sub o) (sub.expr sub e)

@@ -731,9 +731,8 @@ and expression ctxt f x =
         pp f "@[<2>fun@;%a@;%a@]"
           (label_exp ctxt) (l, e0, p)
           (pp_print_pexp_function ctxt "->") e
-    | Pexp_newtype (lid, e, lay) ->
-        pp f "@[<2>fun@;(type@;%a)@;%a@]"
-          (tyvar_layout_loc ~print_quote:false) (lid, lay)
+    | Pexp_newtype (lid, e) ->
+        pp f "@[<2>fun@;(type@;%s)@;%a@]" lid.txt
           (pp_print_pexp_function ctxt "->") e
     | Pexp_function l ->
         pp f "@[<hv>function%a@]" (case_list ctxt) l
@@ -1405,14 +1404,20 @@ and pp_print_pexp_function ctxt sep f x =
   let attrs, _ = check_local_attr x.pexp_attributes in
   let x = { x with pexp_attributes = attrs } in
   if x.pexp_attributes <> [] then pp f "%s@;%a" sep (expression ctxt) x
-  else match x.pexp_desc with
+  else
+    match Jane_syntax.Expression.of_ast x with
+    | Some (Jexp_layout (Lexp_newtype (str,lay,e)), _attrs) ->
+      pp f "@[(type@ %s :@ %a)@]@ %a"
+        str.txt
+        layout_annotation lay
+        (pp_print_pexp_function ctxt sep) e
+    | _ ->
+    match x.pexp_desc with
     | Pexp_fun (label, eo, p, e) ->
       pp f "%a@ %a"
         (label_exp ctxt) (label,eo,p) (pp_print_pexp_function ctxt sep) e
-    | Pexp_newtype (str,e,lay) ->
-      pp f "(type@ %a)@ %a"
-        (tyvar_layout_loc ~print_quote:false) (str,lay)
-        (pp_print_pexp_function ctxt sep) e
+    | Pexp_newtype (str,e) ->
+      pp f "(type@ %s)@ %a" str.txt (pp_print_pexp_function ctxt sep) e
     | _ ->
        pp f "%s@;%a" sep (expression ctxt) x
 
@@ -1432,7 +1437,7 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; _} =
       match e with
       (* no need to handle layout annotations here; the extracted variables
          don't get printed -- they're just used to decide how to print *)
-      | {pexp_desc=Pexp_newtype (tyvar, e, _); pexp_attributes=[]} ->
+      | {pexp_desc=Pexp_newtype (tyvar, e); pexp_attributes=[]} ->
           gadt_exp (tyvar :: tyvars) e
       | {pexp_desc=Pexp_constraint (e, ct); pexp_attributes=[]} ->
           Some (List.rev tyvars, e, ct)
@@ -1878,9 +1883,9 @@ and jane_syntax_expr ctxt attrs f (jexp : Jane_syntax.Expression.t) =
     pp f "((%a)@,%a)" (jane_syntax_expr ctxt []) jexp
       (attributes ctxt) attrs
   else match jexp with
-  | Jexp_comprehension x    -> comprehension_expr ctxt f x
-  | Jexp_immutable_array x  -> immutable_array_expr ctxt f x
-  | Jexp_layout (Lexp_constant x) -> unboxed_constant ctxt f x
+  | Jexp_comprehension x -> comprehension_expr ctxt f x
+  | Jexp_immutable_array x -> immutable_array_expr ctxt f x
+  | Jexp_layout x -> layout_expr ctxt f x
 
 and comprehension_expr ctxt f (cexp : Jane_syntax.Comprehensions.expression) =
   let punct, comp = match cexp with
@@ -1932,6 +1937,18 @@ and immutable_array_expr ctxt f (x : Jane_syntax.Immutable_arrays.expression) =
   | Iaexp_immutable_array elts ->
       pp f "@[<0>@[<2>[:%a:]@]@]"
          (list (simple_expr (under_semi ctxt)) ~sep:";") elts
+
+and layout_expr ctxt f (x : Jane_syntax.Layouts.expression) =
+  match x with
+  (* see similar case in [expression] *)
+  | Lexp_newtype _ when ctxt.pipe || ctxt.semi ->
+    paren true (layout_expr reset_ctxt) f x
+  | Lexp_constant x -> unboxed_constant ctxt f x
+  | Lexp_newtype (lid, layout, inner_expr) ->
+    pp f "@[<2>fun@;(type@;%s :@;%a)@;%a@]"
+      lid.txt
+      layout_annotation layout
+      (pp_print_pexp_function ctxt "->") inner_expr
 
 and unboxed_constant _ctxt f (x : Jane_syntax.Layouts.constant)
   =

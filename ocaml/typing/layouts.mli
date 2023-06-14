@@ -267,11 +267,12 @@ module Layout : sig
   val of_sort : why:concrete_layout_reason -> sort -> t
   val of_const : why:creation_reason -> const -> t
 
+  (* XXX layouts: remove legacy_immediate *)
   val of_annotation :
-    ?skip_check:bool -> context:annotation_context -> Asttypes.layout_annotation -> t
+    ?legacy_immediate:bool -> context:annotation_context -> Asttypes.layout_annotation -> t
 
   val of_annotation_option_default :
-    ?skip_check:bool ->
+    ?legacy_immediate:bool ->
     default:t -> context:annotation_context ->
     Asttypes.layout_annotation option -> t
 

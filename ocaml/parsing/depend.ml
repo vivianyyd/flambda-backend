@@ -300,7 +300,7 @@ let rec add_expr bv exp =
   | Pexp_poly (e, t) -> add_expr bv e; add_opt add_type bv t
   | Pexp_object { pcstr_self = pat; pcstr_fields = fieldl } ->
       let bv = add_pattern bv pat in List.iter (add_class_field bv) fieldl
-  | Pexp_newtype (_, e, _) -> add_expr bv e
+  | Pexp_newtype (_, e) -> add_expr bv e
   | Pexp_pack m -> add_module_expr bv m
   | Pexp_open (o, e) ->
       let bv = open_declaration bv o in
@@ -322,7 +322,7 @@ let rec add_expr bv exp =
 and add_expr_jane_syntax bv : Jane_syntax.Expression.t -> _ = function
   | Jexp_comprehension x -> add_comprehension_expr bv x
   | Jexp_immutable_array x -> add_immutable_array_expr bv x
-  | Jexp_layout (Lexp_constant _) -> add_constant
+  | Jexp_layout x -> add_layout_expr bv x
 
 and add_comprehension_expr bv : Jane_syntax.Comprehensions.expression -> _ =
   function
@@ -360,6 +360,12 @@ and add_comprehension_iterator bv : Jane_syntax.Comprehensions.iterator -> _ =
 and add_immutable_array_expr bv : Jane_syntax.Immutable_arrays.expression -> _ =
   function
   | Iaexp_immutable_array exprs -> List.iter (add_expr bv) exprs
+
+and add_layout_expr bv : Jane_syntax.Layouts.expression -> _ = function
+  | Lexp_constant _ -> add_constant
+  | Lexp_newtype (_, layout, inner_expr) ->
+    add_layout bv layout;
+    add_expr bv inner_expr
 
 and add_cases bv cases =
   List.iter (add_case bv) cases

@@ -403,6 +403,15 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
 let exp_extra sub (extra, loc, attrs) sexp =
   let loc = sub.location sub loc in
   let attrs = sub.attributes sub attrs in
+  let attrs = ref attrs in
+  (* Hack so we can return an extra value out of the [match] expression for Jane
+     Street internal expressions without needing to modify every case, which
+     would open us up to more merge conflicts.
+  *)
+  let add_jane_syntax_attributes { pexp_attributes; pexp_desc; _ } =
+    attrs := pexp_attributes @ !attrs;
+    pexp_desc
+  in
   let add_loc x = mkloc x loc in
   let desc =
     match extra with
@@ -413,10 +422,14 @@ let exp_extra sub (extra, loc, attrs) sexp =
     | Texp_constraint cty ->
         Pexp_constraint (sexp, sub.typ sub cty)
     | Texp_poly cto -> Pexp_poly (sexp, Option.map (sub.typ sub) cto)
-    | Texp_newtype (s, lay) ->
-        Pexp_newtype (add_loc s, sexp, Option.map add_loc lay)
+    | Texp_newtype (s, None) ->
+        Pexp_newtype (add_loc s, sexp)
+    | Texp_newtype (s, Some layout) ->
+        Jane_syntax.Layouts.expr_of ~loc ~attrs:[]
+          (Lexp_newtype(add_loc s, add_loc layout, sexp))
+        |> add_jane_syntax_attributes
   in
-  Exp.mk ~loc ~attrs desc
+  Exp.mk ~loc ~attrs:!attrs desc
 
 let case : type k . mapper -> k case -> _ = fun sub {c_lhs; c_guard; c_rhs} ->
   {

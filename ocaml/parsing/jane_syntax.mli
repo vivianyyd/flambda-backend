@@ -118,10 +118,11 @@ module Layouts : sig
 
   type nonrec expression =
     | Lexp_constant of constant
+    | Lexp_newtype of
+        string Location.loc * Asttypes.layout_annotation * Parsetree.expression
 
   type nonrec pattern =
     | Lpat_constant of constant
-
 
   type nonrec core_type =
     (* ['a : immediate] or [_ : float64] *)

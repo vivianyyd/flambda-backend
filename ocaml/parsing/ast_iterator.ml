@@ -436,6 +436,7 @@ module E = struct
 
   module C = Jane_syntax.Comprehensions
   module IA = Jane_syntax.Immutable_arrays
+  module L = Jane_syntax.Layouts
 
   let iter_iterator sub : C.iterator -> _ = function
     | Range { start; stop; direction = _ } ->
@@ -467,10 +468,16 @@ module E = struct
     | Iaexp_immutable_array elts ->
       List.iter (sub.expr sub) elts
 
+  let iter_layout_exp sub : L.expression -> _ = function
+    | Lexp_constant _ -> iter_constant
+    | Lexp_newtype (_str, layout, inner_expr) ->
+      iter_loc_txt sub sub.layout_annotation layout;
+      sub.expr sub inner_expr
+
   let iter_jst sub : Jane_syntax.Expression.t -> _ = function
     | Jexp_comprehension comp_exp -> iter_comp_exp sub comp_exp
     | Jexp_immutable_array iarr_exp -> iter_iarr_exp sub iarr_exp
-    | Jexp_layout (Lexp_constant _) -> iter_constant
+    | Jexp_layout layout_exp -> iter_layout_exp sub layout_exp
 
   let iter sub
         ({pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} as expr)=
@@ -543,9 +550,7 @@ module E = struct
     | Pexp_poly (e, t) ->
         sub.expr sub e; iter_opt (sub.typ sub) t
     | Pexp_object cls -> sub.class_structure sub cls
-    | Pexp_newtype (_s, e, l) ->
-        iter_opt (iter_loc_txt sub sub.layout_annotation) l;
-        sub.expr sub e
+    | Pexp_newtype (_s, e) -> sub.expr sub e
     | Pexp_pack me -> sub.module_expr sub me
     | Pexp_open (o, e) ->
         sub.open_declaration sub o; sub.expr sub e

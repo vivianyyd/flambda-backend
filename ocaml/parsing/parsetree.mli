@@ -420,10 +420,7 @@ and expression_desc =
            {{!class_field_kind.Cfk_concrete}[Cfk_concrete]} for methods (not
            values). *)
   | Pexp_object of class_structure  (** [object ... end] *)
-
-      (* XXX layouts RAE: move the layout_annotation to an extension *)
-  | Pexp_newtype of string loc * expression * layout_annotation option
-      (** [fun (type t : immediate) -> E] *)
+  | Pexp_newtype of string loc * expression  (** [fun (type t) -> E] *)
   | Pexp_pack of module_expr
       (** [(module ME)].
 
