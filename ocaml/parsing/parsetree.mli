@@ -136,7 +136,7 @@ and core_type_desc =
             - [[< `A|`B > `X `Y ]]
                       when [flag]   is {{!Asttypes.closed_flag.Closed}[Closed]},
                        and [labels] is [Some ["X";"Y"]].
-      *)
+         *)
   | Ptyp_poly of string loc list * core_type
       (** ['a1 ... 'an. T]
 
@@ -167,11 +167,6 @@ and core_type_desc =
          *)
   | Ptyp_package of package_type  (** [(module S)]. *)
   | Ptyp_extension of extension  (** [[%id]]. *)
-
-and type_vars_layouts = layout_annotation option list
-  (* the layout annotations associated with a type-variable list,
-     typically a nearby [string loc list]; this list will always
-     be the same length as that one *)
 
 and package_type = Longident.t loc * (Longident.t loc * core_type) list
 (** As {!package_type} typed values:
@@ -546,7 +541,6 @@ and constructor_declaration =
     {
      pcd_name: string loc;
      pcd_vars: string loc list;
-     pcd_layouts: type_vars_layouts;
      pcd_args: constructor_arguments;
      pcd_res: core_type option;
      pcd_loc: Location.t;
@@ -621,7 +615,6 @@ and extension_constructor_kind =
                    {- [c_args] is [[T1; ... ; Tn]],}
                    {- [t_opt] is [Some T0].}}
        *)
-
   | Pext_rebind of Longident.t loc
   (** [Pext_rebind(D)] re-export the constructor [D] with the new name [C] *)
 

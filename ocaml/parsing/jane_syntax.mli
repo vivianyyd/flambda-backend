@@ -166,6 +166,30 @@ module Layouts : sig
     ?docs:Docstrings.docs ->
     extension_constructor ->
     Parsetree.extension_constructor
+
+  (** Going against the grain of the jane-syntax conventions, this just creates
+      a normal [constructor_declaration]. Why? Because [constructor_declaration]
+      doesn't fit the general style of a description wrapped with
+      attributes. This just seems easier.  But putting this here still allows us
+      to use the jane-syntax attribute format, which is a nice win.
+
+     See also [Ast_helper.Type.constructor], which is a direct inspiration for
+     the interface here. It's meant to be able to be a drop-in replacement.  *)
+  val constructor_declaration_of :
+    loc:Location.t -> attrs:Parsetree.attributes -> info:Docstrings.info ->
+    vars_layouts:(string Location.loc *
+                  Asttypes.layout_annotation option) list ->
+    args:Parsetree.constructor_arguments -> res:Parsetree.core_type option ->
+    string Location.loc -> Parsetree.constructor_declaration
+
+  (** Extract the layouts from a [constructor_declaration]; returns leftover
+      attributes along with the annotated variables. Unlike other pieces
+      of jane-syntax, users of this function will still have to process
+      the remaining pieces of the original [constructor_declaration]. *)
+  val of_constructor_declaration :
+    Parsetree.constructor_declaration ->
+    ((string Location.loc * Asttypes.layout_annotation option) list *
+     Parsetree.attributes) option
 end
 
 (******************************************)
@@ -332,4 +356,3 @@ module Extension_constructor : sig
     ?info:Docstrings.info -> ?docs:Docstrings.docs -> t ->
     Parsetree.extension_constructor
 end
-

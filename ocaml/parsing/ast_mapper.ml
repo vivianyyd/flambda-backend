@@ -146,15 +146,14 @@ module T = struct
     in
     Of.mk ~loc ~attrs desc
 
-  let map_bound_vars sub bound_vars =
-    let bound_var (name, layout_opt) =
-      let name = map_loc sub name in
-      let layout_opt =
-        map_opt (map_loc_txt sub sub.layout_annotation) layout_opt
-      in
-      (name, layout_opt)
+  let var_layout sub (name, layout_opt) =
+    let name = map_loc sub name in
+    let layout_opt =
+      map_opt (map_loc_txt sub sub.layout_annotation) layout_opt
     in
-    List.map bound_var bound_vars
+    (name, layout_opt)
+
+  let map_bound_vars sub bound_vars = List.map (var_layout sub) bound_vars
 
   let map_jst_layouts sub :
         Jane_syntax.Layouts.core_type -> Jane_syntax.Layouts.core_type =
@@ -916,16 +915,23 @@ let default_mapper =
 
 
     constructor_declaration =
-      (fun this {pcd_name; pcd_vars; pcd_layouts; pcd_args;
-                 pcd_res; pcd_loc; pcd_attributes} ->
-        Type.constructor
-          (map_loc this pcd_name)
-          ~vars:(List.map (map_loc this) pcd_vars,
-                 List.map (Option.map (map_loc this)) pcd_layouts)
-          ~args:(T.map_constructor_arguments this pcd_args)
-          ?res:(map_opt (this.typ this) pcd_res)
-          ~loc:(this.location this pcd_loc)
-          ~attrs:(this.attributes this pcd_attributes)
+      (fun this ({pcd_name; pcd_vars; pcd_args;
+                  pcd_res; pcd_loc; pcd_attributes} as pcd) ->
+        let name = map_loc this pcd_name in
+        let args = T.map_constructor_arguments this pcd_args in
+        let res = map_opt (this.typ this) pcd_res in
+        let loc = this.location this pcd_loc in
+        match Jane_syntax.Layouts.of_constructor_declaration pcd with
+        | None ->
+          let vars = List.map (map_loc this) pcd_vars in
+          let attrs = this.attributes this pcd_attributes in
+          Type.constructor name ~vars ~args ?res ~loc ~attrs
+        | Some (vars_layouts, attributes) ->
+          let vars_layouts = List.map (T.var_layout this) vars_layouts in
+          let attrs = this.attributes this attributes in
+          Jane_syntax.Layouts.constructor_declaration_of
+            name ~vars_layouts ~args ~res ~loc ~attrs
+            ~info:Docstrings.empty_info
       );
 
     label_declaration =

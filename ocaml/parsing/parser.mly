@@ -3591,8 +3591,9 @@ generic_constructor_declaration(opening):
 %inline constructor_declaration(opening):
   d = generic_constructor_declaration(opening)
     {
-      let cid, vars, args, res, attrs, loc, info = d in
-      Type.constructor cid ~vars:(List.split vars) ~args ?res ~attrs ~loc ~info
+      let cid, vars_layouts, args, res, attrs, loc, info = d in
+      Jane_syntax.Layouts.constructor_declaration_of
+        cid ~vars_layouts ~args ~res ~attrs ~loc ~info
     }
 ;
 str_exception_declaration:

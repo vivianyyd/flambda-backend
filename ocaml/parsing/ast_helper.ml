@@ -541,12 +541,10 @@ module Type = struct
     }
 
   let constructor ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
-        ?(vars = [],[]) ?(args = Pcstr_tuple []) ?res name =
-    let vars, layouts = vars in
+        ?(vars = []) ?(args = Pcstr_tuple []) ?res name =
     {
      pcd_name = name;
      pcd_vars = vars;
-     pcd_layouts = layouts;
      pcd_args = args;
      pcd_res = res;
      pcd_loc = loc;

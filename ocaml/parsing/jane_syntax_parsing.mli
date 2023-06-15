@@ -217,6 +217,9 @@ module Constructor_argument :
 module Extension_constructor :
   AST with type ast = Parsetree.extension_constructor
 
+module Constructor_declaration :
+  AST with type ast = Parsetree.constructor_declaration
+
 (** Require that an extension is enabled for at least the provided level, or
     else throw an exception (of an abstract type) at the provided location
     saying otherwise.  This is intended to be used in [jane_syntax.ml] when a
@@ -249,6 +252,10 @@ val find_and_remove_jane_syntax_attribute :
   Parsetree.attributes ->
   (Embedded_name.t * Location.t *
    Parsetree.payload * Parsetree.attributes) option
+
+(** Creates an attribute used for encoding syntax from the given [Feature.t] *)
+val make_jane_syntax_attribute :
+  Feature.t -> string list -> Parsetree.payload -> Parsetree.attribute
 
 (** Errors around the representation of our extended ASTs.  These should mostly
     just be fatal, but they're needed for one test case

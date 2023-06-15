@@ -168,21 +168,6 @@ let const_layout ppf lay =
 let layout_annotation i ppf layout =
   line i ppf "%a" const_layout layout.txt
 
-let var_layout ~print_quote ppf (v, l) =
-  let pptv ppf =
-    if print_quote
-    then tyvar ppf
-    else fun s -> fprintf ppf "\"%s\"" s
-  in
-  match l with
-  | None -> fprintf ppf " %a" pptv v.txt
-  | Some lay -> fprintf ppf " (%a : %a)"
-                  pptv v.txt
-                  (layout_annotation 0) lay
-
-let typevars_layouts ppf (vs, ls) =
-  List.iter2 (fun v l -> var_layout ~print_quote:true ppf (v, l)) vs ls
-
 let typevars ppf vs =
   List.iter (fun x -> fprintf ppf " %a" tyvar x.txt) vs
 
@@ -924,11 +909,10 @@ and core_type_x_core_type_x_location i ppf (ct1, ct2, l) =
   core_type (i+1) ppf ct2;
 
 and constructor_decl i ppf
-     {pcd_name; pcd_vars; pcd_layouts; pcd_args; pcd_res; pcd_loc; pcd_attributes} =
+     {pcd_name; pcd_vars; pcd_args; pcd_res; pcd_loc; pcd_attributes} =
   line i ppf "%a\n" fmt_location pcd_loc;
   line (i+1) ppf "%a\n" fmt_string_loc pcd_name;
-  if pcd_vars <> [] then line (i+1) ppf "pcd_vars =%a\n"
-                           typevars_layouts (pcd_vars, pcd_layouts);
+  if pcd_vars <> [] then line (i+1) ppf "pcd_vars =%a\n" typevars pcd_vars;
   attributes i ppf pcd_attributes;
   constructor_arguments (i+1) ppf pcd_args;
   option (i+1) core_type ppf pcd_res

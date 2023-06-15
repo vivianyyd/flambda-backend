@@ -863,6 +863,46 @@ module Layouts = struct
         Desugaring_error.raise ~loc (Unexpected_attribute names)
     in
     lext, attributes
+
+  (*********************************************************)
+  (* Constructing a [constructor_declaration] with layouts *)
+
+  let constructor_declaration_of ~loc ~attrs ~info ~vars_layouts ~args
+        ~res name =
+    let module Ast_of = Ast_of (Constructor_declaration) (Ext) in
+    let vars, layouts = List.split vars_layouts in
+    let ctor_decl =
+      Ast_helper.Type.constructor ~loc ~attrs ~info ~vars ~args ?res name
+    in
+    if List.for_all Option.is_none layouts
+    then ctor_decl
+    else
+      let payload = Encode.option_list_as_payload layouts in
+      Constructor_declaration.make_entire_jane_syntax ~loc feature
+        begin fun () ->
+          Ast_of.wrap_jane_syntax ["vars"] ~payload ctor_decl
+        end
+
+  let of_constructor_declaration_internal (feat : Feature.t) ctor_decl =
+    match feat with
+    | Language_extension Layouts ->
+      let module Of_ast = Of_ast (Ext) in
+      let loc = ctor_decl.pcd_loc in
+      let names, payload, attributes =
+        Of_ast.unwrap_jane_syntax_attributes ~loc ctor_decl.pcd_attributes
+      in
+      let vars_layouts = match names with
+        | [ "vars" ] ->
+          Decode.bound_vars_from_vars_and_payload
+            ~loc ctor_decl.pcd_vars payload
+        | _ -> Desugaring_error.raise ~loc (Unexpected_attribute names)
+      in
+      Some (vars_layouts, attributes)
+    | _ -> None
+
+  let of_constructor_declaration =
+    Constructor_declaration.make_of_ast
+       ~of_ast_internal:of_constructor_declaration_internal
 end
 
 (******************************************************************************)
@@ -999,3 +1039,4 @@ module Extension_constructor = struct
     | Jext_layout lext ->
       Layouts.extension_constructor_of ~loc ~name ~attrs ?info ?docs lext
 end
+

@@ -123,9 +123,6 @@ module T = struct
   let layout_annotation sub =
     iter_loc_txt sub sub.layout_annotation
 
-  let type_vars_layouts sub (tvls : type_vars_layouts) =
-    List.iter (iter_opt (layout_annotation sub)) tvls
-
   let bound_var sub (_, layout) = match layout with
     | None -> ()
     | Some annot -> layout_annotation sub annot
@@ -803,15 +800,22 @@ let default_iterator =
 
 
     constructor_declaration =
-      (fun this {pcd_name; pcd_vars; pcd_layouts; pcd_args;
-                 pcd_res; pcd_loc; pcd_attributes} ->
+      (fun this ({pcd_name; pcd_vars; pcd_args;
+                  pcd_res; pcd_loc; pcd_attributes} as pcd) ->
          iter_loc this pcd_name;
-         List.iter (iter_loc this) pcd_vars;
-         T.type_vars_layouts this pcd_layouts;
+         let attrs =
+           match Jane_syntax.Layouts.of_constructor_declaration pcd with
+           | None ->
+             List.iter (iter_loc this) pcd_vars;
+             pcd_attributes
+           | Some (vars_layouts, attrs) ->
+             List.iter (T.bound_var this) vars_layouts;
+             attrs
+         in
          T.iter_constructor_arguments this pcd_args;
          iter_opt (this.typ this) pcd_res;
          this.location this pcd_loc;
-         this.attributes this pcd_attributes
+         this.attributes this attrs
       );
 
     label_declaration =

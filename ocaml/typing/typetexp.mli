@@ -29,6 +29,10 @@ module TyVarEnv : sig
   (** Evaluate in a narrowed type-variable scope *)
 
   type poly_univars
+  val make_poly_univars : string Location.loc list -> poly_univars
+    (** A variant of [make_poly_univars_layouts] that gets variables
+        without layout annotations *)
+
   val make_poly_univars_layouts :
     context:(string -> Layout.annotation_context) ->
     (string Location.loc * Asttypes.layout_annotation option) list ->

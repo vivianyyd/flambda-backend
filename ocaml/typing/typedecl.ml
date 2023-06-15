@@ -421,25 +421,34 @@ let transl_constructor_arguments env univars closed = function
    defined types. It is updated later by [update_constructor_arguments_layouts]
 *)
 let make_constructor
-      env loc ~cstr_path ~type_path type_params svars slays sargs sret_type =
+      env loc ~cstr_path ~type_path type_params (svars : _ Either.t)
+      sargs sret_type =
+  let tvars = match svars with
+    | Left vars_only -> List.map (fun v -> v.txt, None) vars_only
+    | Right vars_layouts ->
+      List.map (fun (v, l) -> v.txt, Option.map Location.get_txt l) vars_layouts
+  in
   match sret_type with
   | None ->
       let args, targs =
         transl_constructor_arguments env None true sargs
       in
-        targs, None, args, None
+        tvars, targs, None, args, None
   | Some sret_type -> TyVarEnv.with_local_scope begin fun () ->
       (* if it's a generalized constructor we must work in a narrowed
          context so as to not introduce any new constraints *)
       TyVarEnv.reset ();
       let univars, closed =
         match svars with
-        | [] -> None, false
-        | vs ->
+        | Left [] | Right [] -> None, false
+        | Left vars_only ->
+           Ctype.begin_def();
+           Some (TyVarEnv.make_poly_univars vars_only), true
+        | Right vars_layouts ->
            Ctype.begin_def();
            Some (TyVarEnv.make_poly_univars_layouts
                    ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
-                   (List.combine vs slays)), true
+                   vars_layouts), true
       in
       let args, targs =
         transl_constructor_arguments env univars closed sargs
@@ -476,7 +485,7 @@ let make_constructor
          Btype.iter_type_expr_cstr_args set_level args;
          set_level ret_type;
       end;
-      targs, Some tret_type, args, Some ret_type
+      tvars, targs, Some tret_type, args, Some ret_type
   end
 
 let verify_unboxed_attr unboxed_attr sdecl =
@@ -660,27 +669,35 @@ let transl_declaration env sdecl (id, uid) =
           raise(Error(sdecl.ptype_loc, Too_many_constructors));
         let make_cstr scstr =
           let name = Ident.create_local scstr.pcd_name.txt in
-          let targs, tret_type, args, ret_type =
+          let (svars, attributes) : _ Either.t * _ =
+            match Jane_syntax.Layouts.of_constructor_declaration scstr with
+            | None ->
+              Left scstr.pcd_vars,
+              scstr.pcd_attributes
+            | Some (vars_layouts, attributes) ->
+              Right vars_layouts,
+              attributes
+          in
+          let tvars, targs, tret_type, args, ret_type =
             make_constructor env scstr.pcd_loc
               ~cstr_path:(Path.Pident name) ~type_path:path params
-              scstr.pcd_vars scstr.pcd_layouts scstr.pcd_args scstr.pcd_res
+              svars scstr.pcd_args scstr.pcd_res
           in
-          let mk_var_layout sv sl = sv.txt, Option.map Location.get_txt sl in
           let tcstr =
             { cd_id = name;
               cd_name = scstr.pcd_name;
-              cd_vars = List.map2 mk_var_layout scstr.pcd_vars scstr.pcd_layouts;
+              cd_vars = tvars;
               cd_args = targs;
               cd_res = tret_type;
               cd_loc = scstr.pcd_loc;
-              cd_attributes = scstr.pcd_attributes }
+              cd_attributes = attributes }
           in
           let cstr =
             { Types.cd_id = name;
               cd_args = args;
               cd_res = ret_type;
               cd_loc = scstr.pcd_loc;
-              cd_attributes = scstr.pcd_attributes;
+              cd_attributes = attributes;
               cd_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) }
           in
             tcstr, cstr
@@ -1529,16 +1546,11 @@ let transl_type_decl env rec_flag sdecl_list =
 
 (* Translating type extensions *)
 let transl_extension_constructor_decl
-      env type_path typext_params loc id (svars : _ Either.t) sargs sret_type =
-  (* XXX layouts: remove this *)
-  let svars, slays = match svars with
-    | Left svars -> svars, List.map (fun _ -> None) svars
-    | Right svars_slays -> List.split svars_slays
-  in
-  let targs, tret_type, args, ret_type =
+      env type_path typext_params loc id svars sargs sret_type =
+  let tvars, targs, tret_type, args, ret_type =
     make_constructor env loc
       ~cstr_path:(Pident id) ~type_path typext_params
-      svars slays sargs sret_type
+      svars sargs sret_type
   in
   let num_args =
     match targs with
@@ -1549,10 +1561,8 @@ let transl_extension_constructor_decl
   let args, constant =
     update_constructor_arguments_layouts env loc args layouts
   in
-  let strip_locs sv sl = sv.txt, Option.map Location.get_txt sl in
-  let vars = List.map2 strip_locs svars slays in
   args, layouts, constant, ret_type,
-  Text_decl(vars, targs, tret_type)
+  Text_decl(tvars, targs, tret_type)
 
 let transl_extension_constructor_jst env type_path _type_params
       typext_params _priv loc id _attrs :

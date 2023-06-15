@@ -147,6 +147,10 @@ let attribute sub a = {
 
 let attributes sub l = List.map (sub.attribute sub) l
 
+let var_layout ~loc (var, layout) =
+  let add_loc x = mkloc x loc in
+  add_loc var, Option.map add_loc layout
+
 let structure sub str =
   List.map (sub.structure_item sub) str.str_items
 
@@ -261,12 +265,12 @@ let constructor_arguments sub = function
 let constructor_declaration sub cd =
   let loc = sub.location sub cd.cd_loc in
   let attrs = sub.attributes sub cd.cd_attributes in
-  let vars, layouts = List.split cd.cd_vars in
-  let add_loc x = mkloc x loc in
-  Type.constructor ~loc ~attrs
-    ~vars:(List.map add_loc vars, List.map (Option.map add_loc) layouts)
+  let vars_layouts = List.map (var_layout ~loc) cd.cd_vars in
+  Jane_syntax.Layouts.constructor_declaration_of ~loc ~attrs
+    ~vars_layouts
     ~args:(constructor_arguments sub cd.cd_args)
-    ?res:(Option.map (sub.typ sub) cd.cd_res)
+    ~res:(Option.map (sub.typ sub) cd.cd_res)
+    ~info:Docstrings.empty_info
     (map_loc sub cd.cd_name)
 
 let label_declaration sub ld =
@@ -292,13 +296,11 @@ let type_exception sub tyexn =
 
 let extension_constructor sub ext =
   let loc = sub.location sub ext.ext_loc in
-  let add_loc x = mkloc x loc in
   let attrs = sub.attributes sub ext.ext_attributes in
   let name = map_loc sub ext.ext_name in
   match ext.ext_kind with
   | Text_decl (vs, args, ret) ->
-    let one_var (v, l) = add_loc v, Option.map add_loc l in
-    let vs = List.map one_var vs in
+    let vs = List.map (var_layout ~loc) vs in
     let args = constructor_arguments sub args in
     let ret = Option.map (sub.typ sub) ret in
     Jane_syntax.Layouts.extension_constructor_of
@@ -951,9 +953,7 @@ let core_type sub ct =
     | Ttyp_variant (list, bool, labels) ->
         Ptyp_variant (List.map (sub.row_field sub) list, bool, labels)
     | Ttyp_poly (list, ct) ->
-        let add_loc x = mkloc x loc in
-        let bound_var (var, layout) = add_loc var, Option.map add_loc layout in
-        let bound_vars = List.map bound_var list in
+        let bound_vars = List.map (var_layout ~loc) list in
         Jane_syntax.Layouts.type_of ~loc ~attrs:[]
           (Ltyp_poly { bound_vars; inner_type = sub.typ sub ct }) |>
         add_jane_syntax_attributes

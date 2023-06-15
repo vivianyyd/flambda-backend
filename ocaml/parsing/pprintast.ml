@@ -1744,9 +1744,13 @@ and type_declaration ctxt f x =
   in
   let constructor_declaration f pcd =
     pp f "|@;";
+    let vars_layouts, attrs =
+      match Jane_syntax.Layouts.of_constructor_declaration pcd with
+      | None -> List.map (fun v -> v, None) pcd.pcd_vars, pcd.pcd_attributes
+      | Some stuff -> stuff
+    in
     constructor_declaration ctxt f
-      (pcd.pcd_name.txt, List.combine pcd.pcd_vars pcd.pcd_layouts,
-       pcd.pcd_args, pcd.pcd_res, pcd.pcd_attributes)
+      (pcd.pcd_name.txt, vars_layouts, pcd.pcd_args, pcd.pcd_res, attrs)
   in
   let repr f =
     let intro f =

@@ -213,8 +213,7 @@ module Type:
       type_declaration
 
     val constructor: ?loc:loc -> ?attrs:attrs -> ?info:info ->
-      ?vars:(str list * layout_annotation option list) ->
-      ?args:constructor_arguments -> ?res:core_type ->
+      ?vars:str list -> ?args:constructor_arguments -> ?res:core_type ->
       str ->
       constructor_declaration
     val field: ?loc:loc -> ?attrs:attrs -> ?info:info ->

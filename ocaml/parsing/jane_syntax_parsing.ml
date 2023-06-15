@@ -138,7 +138,7 @@ end = struct
 end
 
 (** Was this embedded as an [[%extension_node]] or an [[@attribute]]?  Not
-    exported. *)
+    exported. Used only for error messages. *)
 module Embedding_syntax = struct
   type t =
     | Extension_node
@@ -501,6 +501,15 @@ let find_and_remove_jane_syntax_attribute =
   fun attributes -> loop attributes ~rev_prefix:[]
 ;;
 
+let make_jane_syntax_attribute name payload =
+  { attr_name =
+      { txt = Embedded_name.to_string name
+      ; loc = !Ast_helper.default_loc
+      }
+  ; attr_loc = !Ast_helper.default_loc
+  ; attr_payload = payload
+  }
+
 (** For a syntactic category, produce translations into and out of
     our novel syntax, using parsetree attributes as the encoding.
 *)
@@ -517,15 +526,7 @@ module Make_with_attribute
     let embedding_syntax = Embedding_syntax.Attribute
 
     let make_jane_syntax name ?(payload = PStr []) ast =
-      let attr =
-        { attr_name =
-            { txt = Embedded_name.to_string name
-            ; loc = !Ast_helper.default_loc
-            }
-        ; attr_loc = !Ast_helper.default_loc
-        ; attr_payload = payload
-        }
-      in
+      let attr = make_jane_syntax_attribute name payload in
       with_attributes ast (attr :: attributes ast)
 
     let match_jane_syntax ast =
@@ -749,6 +750,19 @@ module Structure_item0 = Make_with_extension_node (struct
       | _ -> None
 end)
 
+
+(** Constructor declarations; embedded with attributes. *)
+module Constructor_declaration0 = Make_with_attribute(struct
+  type ast = Parsetree.constructor_declaration
+
+  let plural = "constructor declarations"
+  let location pcd = pcd.pcd_loc
+  let with_location pcd loc = { pcd with pcd_loc = loc }
+
+  let attributes pcd = pcd.pcd_attributes
+  let with_attributes pcd pcd_attributes = { pcd with pcd_attributes }
+end)
+
 (******************************************************************************)
 (* Main exports *)
 
@@ -813,6 +827,11 @@ module Make_ast (AST : AST_internal) : AST with type ast = AST.ast = struct
     of_ast
 end
 
+let make_jane_syntax_attribute feature trailing_components payload =
+  make_jane_syntax_attribute
+    (Embedded_name.of_feature feature trailing_components)
+    payload
+
 (* See Note [Hiding internal details] *)
 module Expression = Make_ast(Expression0)
 module Pattern = Make_ast(Pattern0)
@@ -822,3 +841,4 @@ module Structure_item = Make_ast(Structure_item0)
 module Core_type = Make_ast(Core_type0)
 module Constructor_argument = Make_ast(Constructor_argument0)
 module Extension_constructor = Make_ast(Extension_constructor0)
+module Constructor_declaration = Make_ast(Constructor_declaration0)
