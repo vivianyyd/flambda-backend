@@ -437,6 +437,8 @@ module Layouts = struct
 
   include Ext
 
+  module Of_ast = Of_ast (Ext)
+
   type constant =
     | Float of string * char option
     | Integer of string * char
@@ -674,7 +676,6 @@ module Layouts = struct
   (* Desugaring expressions *)
 
   let of_expr expr =
-    let module Of_ast = Of_ast (Ext) in
     let loc = expr.pexp_loc in
     let names, payload, attributes =
       Of_ast.unwrap_jane_syntax_attributes ~loc expr.pexp_attributes
@@ -762,7 +763,6 @@ module Layouts = struct
   (* Desugaring types *)
 
   let of_type typ =
-    let module Of_ast = Of_ast (Ext) in
     let loc = typ.ptyp_loc in
     let names, payload, attributes =
       Of_ast.unwrap_jane_syntax_attributes ~loc typ.ptyp_attributes
@@ -843,7 +843,6 @@ module Layouts = struct
   (* Desugaring extension constructor *)
 
   let of_extension_constructor ext =
-    let module Of_ast = Of_ast (Ext) in
     let loc = ext.pext_loc in
     let names, payload, attributes =
       Of_ast.unwrap_jane_syntax_attributes ~loc ext.pext_attributes
@@ -886,7 +885,6 @@ module Layouts = struct
   let of_constructor_declaration_internal (feat : Feature.t) ctor_decl =
     match feat with
     | Language_extension Layouts ->
-      let module Of_ast = Of_ast (Ext) in
       let loc = ctor_decl.pcd_loc in
       let names, payload, attributes =
         Of_ast.unwrap_jane_syntax_attributes ~loc ctor_decl.pcd_attributes
