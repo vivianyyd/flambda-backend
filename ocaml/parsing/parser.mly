@@ -284,11 +284,6 @@ let mkpat_opt_constraint ~loc p = function
   | None -> p
   | Some typ -> mkpat ~loc (Ppat_constraint(p, typ))
 
-(* XXX layouts: remove *)
-let drop_layouts (vars_layouts, inner_type) =
-  let vars = List.map fst vars_layouts in
-  Ptyp_poly(vars, inner_type)
-
 let syntax_error () =
   raise Syntaxerr.Escape_error
 
@@ -2589,6 +2584,12 @@ expr:
     { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
   | indexop_expr(qualified_dotop, expr_semi_list, LESSMINUS v=expr {Some v})
     { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
+  | FUN ext_attributes LPAREN TYPE newtypes RPAREN fun_def
+    { let loc = $sloc in
+      wrap_exp_attrs ~loc (mk_newtypes ~loc $5 $7) $2 }
+  | FUN ext_attributes LPAREN TYPE mkrhs(LIDENT) COLON layout_annotation RPAREN fun_def
+    { let loc = $sloc in
+      wrap_exp_attrs ~loc (mk_newtypes ~loc:$sloc [$5, Some $7] $9) $2 }
   | expr attribute
       { Exp.attr $1 $2 }
 /* BEGIN AVOID */
@@ -2614,10 +2615,6 @@ expr:
   | FUN ext_attributes labeled_simple_pattern fun_def
       { let (l,o,p) = $3 in
         Pexp_fun(l, o, p, $4), $2 }
-  | FUN ext_attributes LPAREN TYPE newtypes RPAREN fun_def
-      { (mk_newtypes ~loc:$sloc $5 $7).pexp_desc, $2 }
-  | FUN ext_attributes LPAREN TYPE mkrhs(LIDENT) COLON layout_annotation RPAREN fun_def
-      { (mk_newtypes ~loc:$sloc [$5, Some $7] $9).pexp_desc, $2 }
   | MATCH ext_attributes seq_expr WITH match_cases
       { Pexp_match($3, $5), $2 }
   | TRY ext_attributes seq_expr WITH match_cases
@@ -2926,10 +2923,16 @@ let_binding_body_no_punning:
         (pat, exp) }
   | optional_local let_ident COLON poly(core_type) EQUAL seq_expr
       { let patloc = ($startpos($2), $endpos($4)) in
+        let bound_vars, inner_type = $4 in
+        let ltyp = Jane_syntax.Layouts.Ltyp_poly { bound_vars; inner_type } in
+        let typ_loc = Location.ghostify (make_loc $loc($4)) in
+        let typ =
+          Jane_syntax.Layouts.type_of ~loc:typ_loc ~attrs:[] ltyp
+        in
         let pat =
           mkpat_local_if $1
             (ghpat ~loc:patloc
-               (Ppat_constraint($2, ghtyp ~loc:($loc($4)) (drop_layouts $4))))
+               (Ppat_constraint($2, typ)))
             $loc($1)
         in
         let exp = mkexp_local_if $1 ~loc:$sloc ~kwd_loc:($loc($1)) $6 in
@@ -3804,8 +3807,10 @@ with_type_binder:
 possibly_poly(X):
   X
     { $1 }
-| mktyp(poly(X) { drop_layouts($1) })
-    { $1 }
+| poly(X)
+    { let bound_vars, inner_type = $1 in
+      Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) ~attrs:[]
+        (Ltyp_poly { bound_vars; inner_type }) }
 ;
 %inline poly_type:
   possibly_poly(core_type)

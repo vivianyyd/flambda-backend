@@ -262,7 +262,6 @@ module Layout = struct
     | Univar of string
     | Type_variable of string
     | Type_wildcard of Location.t
-    | Type
 
   type creation_reason =
     | Annotated of annotation_context * Location.t
@@ -398,6 +397,7 @@ module Layout = struct
     | Value -> fresh_layout (Sort Sort.value) ~why
     | Void -> fresh_layout (Sort Sort.void) ~why
 
+  (* CR layouts v1.5: remove legacy_immediate *)
   let of_annotation ?(legacy_immediate=false) ~context Location.{ loc; txt = const } =
     begin match const with
     | Immediate | Immediate64 | Value when legacy_immediate -> ()
@@ -613,8 +613,6 @@ module Layout = struct
           fprintf ppf "the type variable %s" name
       | Type_wildcard loc ->
           fprintf ppf "the wildcard _ at %a" Location.print_loc loc
-      | Type ->
-          fprintf ppf "a type"
 
     let format_any_creation_reason ppf : any_creation_reason -> unit = function
       | Missing_cmi p ->
@@ -1051,8 +1049,6 @@ module Layout = struct
           fprintf ppf "Type_variable %S" name
       | Type_wildcard loc ->
           fprintf ppf "Type_wildcard (%a)" Location.print_loc loc
-      | Type ->
-          fprintf ppf "Type"
 
     let any_creation_reason ppf : any_creation_reason -> unit = function
       | Missing_cmi p -> fprintf ppf "Missing_cmi %a" Path.print p

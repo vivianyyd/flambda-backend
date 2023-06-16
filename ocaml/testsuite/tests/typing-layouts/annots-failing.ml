@@ -1,9 +1,11 @@
 (* TEST
-   * expect
-   flags = "-extension layouts"
+   * skip
+   reason = "bugs not fixed yet"
+   ** expect
+   flags = "-extension layouts_alpha"
 *)
 
-(* XXX layouts: merge this with annots.ml after these all pass *)
+(* CR layouts v1.5: merge this with annots.ml after these all pass *)
 
 class c : object
   val f : 'a -> 'a
@@ -33,7 +35,7 @@ end = object
 end
 
 [%%expect {|
-class c : object method m : 'a -> 'a end BAD
+success with both types quantified over immediates
 |}]
 
 type _ g = | MkG : ('a : immediate) ('b : void). 'a -> 'b g

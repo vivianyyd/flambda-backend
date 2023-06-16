@@ -1014,7 +1014,8 @@ and transl_type_alias env policy mode alias_loc styp name_opt layout_annot_opt =
         | Some layout_annot -> layout_annot
       in
       let layout =
-          Layout.of_annotation ~context:(Type_variable "_") layout_annot
+          Layout.of_annotation
+            ~context:(Type_wildcard layout_annot.loc) layout_annot
       in
       begin match constrain_type_layout env cty_expr layout with
       | Ok () -> ()
