@@ -76,3 +76,13 @@ Line 2, characters 11-20:
 Error: Layout immediate is more experimental than allowed by -extension layouts.
        You must enable -extension layouts_beta to use this feature.
 |}]
+
+(*****************************************************)
+(* Test 7: Recursive propagation of immediacy checks *)
+
+(* CR layouts: copy test from datatypes_alpha with float64 when available *)
+
+(**************************************)
+(* Test 8: Defaulting type parameters *)
+
+(* CR layouts: copy test from datatypes_alpha with float64 when available *)

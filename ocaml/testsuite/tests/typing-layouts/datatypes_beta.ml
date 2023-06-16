@@ -81,3 +81,13 @@ Error: This expression has type float but an expression was expected of type
          ('a : immediate)
        float has layout value, which is not a sublayout of immediate.
 |}];;
+
+(*****************************************************)
+(* Test 7: Recursive propagation of immediacy checks *)
+
+(* CR layouts: copy test from datatypes_alpha with float64 when available *)
+
+(**************************************)
+(* Test 8: Defaulting type parameters *)
+
+(* CR layouts: copy test from datatypes_alpha with float64 when available *)

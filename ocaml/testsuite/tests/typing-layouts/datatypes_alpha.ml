@@ -302,3 +302,28 @@ and t7_2 = { x : t7; } [@@unboxed]
 and t7_void : void
 type t7_3 = t7_2
 |}]
+
+(**************************************)
+(* Test 8: Defaulting type parameters *)
+
+type ('a : void) void_t
+
+[%%expect {|
+type ('a : void) void_t
+|}]
+
+type 'b t = 'b void_t * t2
+and t2 = t_void void_t
+
+[%%expect {|
+type ('b : void) t = 'b void_t * t2
+and t2 = t_void void_t
+|}]
+
+type 'b t = 'b void_t * t2
+and t2 = Mk1 of t_void t | Mk2
+
+[%%expect {|
+type ('b : void) t = 'b void_t * t2
+and t2 = Mk1 of t_void t | Mk2
+|}]

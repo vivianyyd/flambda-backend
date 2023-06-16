@@ -266,7 +266,8 @@ module Layout : sig
   val of_sort : why:concrete_layout_reason -> sort -> t
   val of_const : why:creation_reason -> const -> t
 
-  (* XXX layouts: remove legacy_immediate *)
+  (* CR layouts v1.5: remove legacy_immediate when the old attributes mechanism
+     is rerouted away from the new annotations mechanism *)
   val of_annotation :
     ?legacy_immediate:bool -> context:annotation_context -> Asttypes.layout_annotation -> t
 

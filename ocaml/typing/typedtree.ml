@@ -581,8 +581,6 @@ and type_declaration =
     typ_manifest: core_type option;
     typ_loc: Location.t;
     typ_attributes: attribute list;
-    (* XXX layouts RAE: should that be a const_layout? *)
-    typ_layout_annotation: layout option;
    }
 
 and type_kind =

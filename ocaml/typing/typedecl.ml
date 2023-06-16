@@ -204,33 +204,6 @@ let enter_type rec_flag env sdecl (id, uid) =
   let decl =
     { type_params = List.map (fun (ctyp, _) -> ctyp.ctyp_type)
                       (make_params ~generic:true env path sdecl.ptype_params);
-          (* XXX layouts: this used to be generic *)
-        (* CR layouts: At the moment, we're defaulting type parameters in
-           recursive type declarations to layout value.  We could probably allow
-           (Sort 'l) and default to value if it's not determined by use.
-
-           Richard supplies the following example:
-
-           (* setup: *)
-           type t_void [@@void]
-           type ('a : void) void_t
-
-           (* case 1: *)
-           type 'b t = 'b void_t * t2
-           and t2 = t_void void_t
-
-           (* case 2: *)
-           type 'b t = 'b void_t * t2
-           and t2 = t_void t
-
-           Case 1 is accepted and case 2 is rejected, which isn't the end of the
-           world, but could perhaps be improved.
-        *)
-        (* CR layouts v2: Actually, RAE thinks this is just wrong now, because
-           make_params defaults to a sort variable and this defaults to value.
-           I'm worried that the value here will propagate somewhere and then
-           conflict with an inferred e.g. float64 somewhere. *)
-        (* XXX layouts: clean up above comments *)
       type_arity = arity;
       type_kind = Type_abstract;
       type_layout = layout;
@@ -808,7 +781,6 @@ let transl_declaration env sdecl (id, uid) =
       typ_kind = tkind;
       typ_private = sdecl.ptype_private;
       typ_attributes = sdecl.ptype_attributes;
-      typ_layout_annotation = layout_annotation;
     }
 
 (* Generalize a type declaration *)
@@ -2181,12 +2153,6 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_variance = new_type_variance;
       type_separability = new_type_separability;
     } in
-  let layout_annotation =
-    layout_of_attributes
-      ~legacy_immediate:false
-      ~context:(With_constraint sdecl.ptype_name.txt)
-      sdecl.ptype_attributes
-  in
   Ctype.end_def();
   generalize_decl new_sig_decl;
   {
@@ -2200,7 +2166,6 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     typ_kind = Ttype_abstract;
     typ_private = sdecl.ptype_private;
     typ_attributes = sdecl.ptype_attributes;
-    typ_layout_annotation = layout_annotation;
   }
 
 (* Approximate a type declaration: just make all types abstract *)
