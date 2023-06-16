@@ -633,7 +633,7 @@ let mk_verbose f =
 ;;
 
 let mk_verbose_types f =
-  "-verbose-types", Arg.Unit f, " Print expert information within types"
+  "-verbose-types", Arg.Unit f, " Print detailed information within types"
 ;;
 
 let mk_no_verbose_types f =

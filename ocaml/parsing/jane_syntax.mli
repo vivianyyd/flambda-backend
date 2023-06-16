@@ -117,30 +117,51 @@ module Layouts : sig
     | Integer of string * char
 
   type nonrec expression =
+    (* examples: [ #2.0 ] or [ #42L ] *)
+    (* This is represented as an attribute wrapping a [Pexp_constant] node. *)
     | Lexp_constant of constant
+
+    (* [fun (type a : immediate) -> ...] *)
+    (* This is represented as an attribute wrapping a [Pexp_newtype] node. *)
     | Lexp_newtype of
         string Location.loc * Asttypes.layout_annotation * Parsetree.expression
 
   type nonrec pattern =
+    (* examples: [ #2.0 ] or [ #42L ] *)
+    (* This is represented as an attribute wrapping a [Ppat_constant] node. *)
     | Lpat_constant of constant
 
   type nonrec core_type =
     (* ['a : immediate] or [_ : float64] *)
+    (* This is represented by an attribute wrapping either a [Ptyp_any] or
+       a [Ptyp_var] node. *)
     | Ltyp_var of { name : string option
                   ; layout : Asttypes.layout_annotation }
 
     (* [('a : immediate) 'b 'c ('d : value). 'a -> 'b -> 'c -> 'd] *)
+    (* This is represented by an attribute wrapping a [Ptyp_poly] node. *)
+    (* This is used instead of [Ptyp_poly] only where there is at least one
+       actual layout annotation. If there is a polytype with no layout
+       annotations at all, [Ptyp_poly] is used instead. This saves space in the
+       parsed representation and guarantees that we don't accidentally try to
+       require the layouts extension. *)
     | Ltyp_poly of { bound_vars : (string Location.loc *
                                    Asttypes.layout_annotation option) list
                    ; inner_type : Parsetree.core_type }
 
     (* [ty as ('a : immediate)] *)
+    (* This is represented by an attribute wrapping either a [Ptyp_alias] node
+       or, in the [ty as (_ : layout)] case, the annotated type itself, with no
+       intervening [type_desc]. *)
     | Ltyp_alias of { aliased_type : Parsetree.core_type
                     ; name : string option
                     ; layout : Asttypes.layout_annotation }
 
   type nonrec extension_constructor =
     (* [ 'a ('b : immediate) ('c : float64). 'a * 'b * 'c -> exception ] *)
+    (* This is represented as an attribute on a [Pext_decl] node. *)
+    (* Like [Ltyp_poly], this is used only when there is at least one layout
+       annotation. Otherwise, we will have a [Pext_decl]. *)
     | Lext_decl of (string Location.loc *
                     Asttypes.layout_annotation option) list *
                    Parsetree.constructor_arguments *

@@ -110,7 +110,7 @@ module Typ = struct
             Ptyp_class (longident, List.map loop lst)
         (* A Ptyp_alias might be a layout annotation (that is, it might have
            attributes which mean it should be interpreted as a
-           Jane_syntax.Layouts.Ltyp_alias), but the code here still has the
+           [Jane_syntax.Layouts.Ltyp_alias]), but the code here still has the
            correct behavior. *)
         | Ptyp_alias(core_type, string) ->
             check_variable var_names t.ptyp_loc string;

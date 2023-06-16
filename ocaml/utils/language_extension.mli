@@ -57,7 +57,7 @@ val maturity_to_string : maturity -> string
 
 (** Get the command line string enabling the given extension, if it's
     enabled; otherwise None *)
-val get_enabled_command_line_string : 'a t -> string option
+val get_command_line_string_if_enabled : 'a t -> string option
 
 (** Enable and disable according to command-line strings; these raise
     an exception if the input string is invalid. *)

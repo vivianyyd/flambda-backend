@@ -815,7 +815,7 @@ module Layouts = struct
 
   let extension_constructor_of ~loc ~name ~attrs ?info ?docs ext =
     (* using optional parameters to hook into existing defaulting
-       in Ast_helper.Te.decl, which seems unwise to duplicate *)
+       in [Ast_helper.Te.decl], which seems unwise to duplicate *)
     let module Ast_of = Ast_of (Extension_constructor) (Ext) in
     let exception No_wrap_necessary of Parsetree.extension_constructor in
     try

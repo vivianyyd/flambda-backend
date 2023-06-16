@@ -1172,7 +1172,7 @@ module Layout = struct
         (Language_extension.to_command_line_string
            Layouts required_layouts_level)
     in
-    match Language_extension.get_enabled_command_line_string Layouts with
+    match Language_extension.get_command_line_string_if_enabled Layouts with
     | None ->
       Location.errorf ~loc
         "@[<v>The appropriate layouts extension is not enabled.@;%t@]"

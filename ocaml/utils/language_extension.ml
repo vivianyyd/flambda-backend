@@ -342,7 +342,7 @@ let is_enabled extn =
   in
   check !extensions
 
-let get_enabled_command_line_string extn =
+let get_command_line_string_if_enabled extn =
   let rec find = function
     | [] -> None
     | (Pair (e, v) :: _) when equal e extn -> Some (to_command_line_string e v)
