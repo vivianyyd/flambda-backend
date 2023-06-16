@@ -151,17 +151,6 @@ let arg_label i ppf = function
 let typevars ppf vs =
   List.iter (fun x -> fprintf ppf " %a" Printast.tyvar x.txt) vs
 
-let layout_annotation i ppf layout =
-  line i ppf "%s" (Layouts.Layout.string_of_const layout.txt)
-
-let layout_annotation_option ppf = function
-  | None -> fprintf ppf "--"
-  | Some lay -> fprintf ppf "%s" (Layouts.Layout.string_of_const lay.txt)
-
-let type_vars_layouts ppf vars_layouts =
-  List.iter (fun lay -> fprintf ppf " %a" layout_annotation_option lay)
-    vars_layouts
-
 let rec core_type i ppf x =
   with_location_mapping ~loc:x.ptyp_loc ppf (fun () ->
   line i ppf "core_type %a\n" fmt_location x.ptyp_loc;
@@ -169,9 +158,7 @@ let rec core_type i ppf x =
   let i = i+1 in
   match x.ptyp_desc with
   | Ptyp_any -> line i ppf "Ptyp_any\n";
-  | Ptyp_var (s, layout) ->
-      line i ppf "Ptyp_var %s\n" s;
-      option i layout_annotation ppf layout
+  | Ptyp_var (s) -> line i ppf "Ptyp_var %s\n" s;
   | Ptyp_arrow (l, ct1, ct2) ->
       line i ppf "Ptyp_arrow\n";
       arg_label i ppf l;
@@ -206,13 +193,12 @@ let rec core_type i ppf x =
   | Ptyp_alias (ct, s) ->
       line i ppf "Ptyp_alias \"%s\"\n" s;
       core_type i ppf ct;
-  | Ptyp_poly (sl, ct, lays) ->
+  | Ptyp_poly (sl, ct) ->
       line i ppf "Ptyp_poly%a\n"
         (fun ppf ->
            List.iter (fun x -> fprintf ppf " %a" Printast.tyvar x.txt)
         )
         sl;
-      line i ppf "layouts%a\n" type_vars_layouts lays;
       core_type i ppf ct;
   | Ptyp_package (s, l) ->
       line i ppf "Ptyp_package %a\n" fmt_longident_loc s;
@@ -403,9 +389,8 @@ and expression i ppf x =
   | Pexp_object s ->
       line i ppf "Pexp_object\n";
       class_structure i ppf s
-  | Pexp_newtype (s, e, lay) ->
+  | Pexp_newtype (s, e) ->
       line i ppf "Pexp_newtype \"%s\"\n" s.txt;
-      layout_annotation_option ppf lay;
       expression i ppf e
   | Pexp_pack me ->
       line i ppf "Pexp_pack\n";
@@ -520,11 +505,9 @@ and extension_constructor i ppf x =
 
 and extension_constructor_kind i ppf x =
   match x with
-      Pext_decl(v, a, r, l) ->
+      Pext_decl(v, a, r) ->
         line i ppf "Pext_decl\n";
-        if v <> [] then
-          (line (i+1) ppf "vars%a\n" typevars v;
-           line (i+1) ppf "layouts%a\n" type_vars_layouts l);
+        if v <> [] then line (i+1) ppf "vars%a\n" typevars v;
         constructor_arguments (i+1) ppf a;
         option (i+1) core_type ppf r;
     | Pext_rebind li ->

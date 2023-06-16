@@ -642,13 +642,13 @@ let transl_declaration env sdecl (id, uid) =
           raise(Error(sdecl.ptype_loc, Too_many_constructors));
         let make_cstr scstr =
           let name = Ident.create_local scstr.pcd_name.txt in
-          let (svars, attributes) : _ Either.t * _ =
+          let svars, attributes =
             match Jane_syntax.Layouts.of_constructor_declaration scstr with
             | None ->
-              Left scstr.pcd_vars,
+              Either.Left scstr.pcd_vars,
               scstr.pcd_attributes
             | Some (vars_layouts, attributes) ->
-              Right vars_layouts,
+              Either.Right vars_layouts,
               attributes
           in
           let tvars, targs, tret_type, args, ret_type =
