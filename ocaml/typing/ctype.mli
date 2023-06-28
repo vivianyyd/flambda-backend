@@ -271,7 +271,8 @@ val all_distinct_vars: Env.t -> type_expr list -> bool
 
 type matches_result =
   | Unification_failure of Errortrace.unification_error
-  | Layout_mismatch of { original_layout : layout; inferred_layout : layout }
+  | Layout_mismatch of { original_layout : layout; inferred_layout : layout
+                       ; ty : type_expr }
   | All_good
 val matches: expand_error_trace:bool -> Env.t ->
   type_expr -> type_expr -> matches_result

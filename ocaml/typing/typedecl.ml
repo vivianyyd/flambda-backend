@@ -816,7 +816,7 @@ let rec check_constraints_rec env loc visited ty =
         match Ctype.matches ~expand_error_trace:false env ty ty' with
         | Unification_failure err ->
           raise (Error(loc, Constraint_failed (env, err)))
-        | Layout_mismatch { original_layout; inferred_layout } ->
+        | Layout_mismatch { original_layout; inferred_layout; ty } ->
           raise (Error(loc, Layout_of_type (ty,
                               (Layout.Violation.of_ (Not_a_sublayout
                                  (original_layout, inferred_layout))))))

@@ -254,6 +254,23 @@ Error: This field value has type 'b -> 'b which is less general than
 |}]
 (* CR layouts v1.5: that's a pretty awful error message *)
 
+type ('a : immediate) t_imm
+
+type s = { f : ('a : value). 'a -> 'a u }
+and 'a u = 'a t_imm
+
+[%%expect{|
+type ('a : immediate) t_imm
+Line 3, characters 15-39:
+3 | type s = { f : ('a : value). 'a -> 'a u }
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type 'a has layout value, which is not a sublayout of immediate.
+|}]
+(* CR layouts v1.5: the location on that message is wrong. But it's hard
+   to improve, because it comes from re-checking typedtree, where we don't
+   have locations any more. I conjecture the same location problem exists
+   when constraints aren't satisfied. *)
+
 (********************)
 (* Test 5: newtypes *)
 

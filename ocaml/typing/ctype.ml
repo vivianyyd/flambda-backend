@@ -4594,7 +4594,8 @@ let all_distinct_vars env vars =
 
 type matches_result =
   | Unification_failure of Errortrace.unification_error
-  | Layout_mismatch of { original_layout : layout; inferred_layout : layout }
+  | Layout_mismatch of { original_layout : layout; inferred_layout : layout
+                       ; ty : type_expr }
   | All_good
 
 module Matches = struct
@@ -4639,7 +4640,8 @@ module Matches = struct
   module No_trace = struct
     type matches_result_ =
       | Unification_failure
-      | Layout_mismatch of { original_layout : layout; inferred_layout : layout }
+      | Layout_mismatch of { original_layout : layout; inferred_layout : layout
+                           ; ty : type_expr }
       | All_good
   end
 
@@ -4658,7 +4660,7 @@ module Matches = struct
            | Tvar { layout = inferred_layout } ->
              if Layout.equate inferred_layout original_layout
              then All_good
-             else Layout_mismatch { original_layout; inferred_layout }
+             else Layout_mismatch { original_layout; inferred_layout; ty }
            | _ -> Unification_failure
          end
     in
@@ -4679,8 +4681,8 @@ module Matches = struct
               else unexpanded_diff ~got:ty ~expected:ty'
           in
           Unification_failure (unification_error ~trace:[diff])
-        | Layout_mismatch { original_layout; inferred_layout } ->
-          Layout_mismatch { original_layout; inferred_layout }
+        | Layout_mismatch { original_layout; inferred_layout; ty } ->
+          Layout_mismatch { original_layout; inferred_layout; ty }
         | All_good -> All_good
       in
       backtrack snap;
