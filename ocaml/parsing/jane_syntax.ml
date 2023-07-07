@@ -722,8 +722,9 @@ module Layouts = struct
   (*******************************************************)
   (* Encoding types *)
 
+  module Type_of = Ast_of (Core_type) (Ext)
+
   let type_of ~loc ~attrs typ =
-    let module Ast_of = Ast_of (Core_type) (Ext) in
     let exception No_wrap_necessary of Parsetree.core_type in
     try
       (* See Note [Wrapping with make_entire_jane_syntax] *)
@@ -731,7 +732,7 @@ module Layouts = struct
         match typ with
         | Ltyp_var { name; layout } ->
           let payload = Encode.as_payload layout in
-          Ast_of.wrap_jane_syntax ["var"] ~payload @@
+          Type_of.wrap_jane_syntax ["var"] ~payload @@
           begin match name with
           | None -> Ast_helper.Typ.any ~loc ~attrs ()
           | Some name -> Ast_helper.Typ.var ~loc ~attrs name
@@ -744,7 +745,7 @@ module Layouts = struct
           then raise (No_wrap_necessary tpoly)
           else
             let payload = Encode.option_list_as_payload layouts in
-            Ast_of.wrap_jane_syntax ["poly"] ~payload tpoly
+            Type_of.wrap_jane_syntax ["poly"] ~payload tpoly
 
         | Ltyp_alias { aliased_type; name; layout } ->
           let payload = Encode.as_payload layout in
@@ -754,7 +755,7 @@ module Layouts = struct
                                   aliased_type.ptyp_attributes @ attrs }
             | Some name -> "named", Ast_helper.Typ.alias aliased_type name
           in
-          Ast_of.wrap_jane_syntax ["alias"; has_name] ~payload inner_typ
+          Type_of.wrap_jane_syntax ["alias"; has_name] ~payload inner_typ
       end
     with
       No_wrap_necessary result_type -> result_type
@@ -813,10 +814,11 @@ module Layouts = struct
   (*******************************************************)
   (* Encoding extension constructor *)
 
+  module Ext_ctor_of = Ast_of (Extension_constructor) (Ext)
+
   let extension_constructor_of ~loc ~name ~attrs ?info ?docs ext =
     (* using optional parameters to hook into existing defaulting
        in [Ast_helper.Te.decl], which seems unwise to duplicate *)
-    let module Ast_of = Ast_of (Extension_constructor) (Ext) in
     let exception No_wrap_necessary of Parsetree.extension_constructor in
     try
       (* See Note [Wrapping with make_entire_jane_syntax] *)
@@ -834,7 +836,7 @@ module Layouts = struct
               then raise (No_wrap_necessary ext_ctor)
               else
                 let payload = Encode.option_list_as_payload layouts in
-                Ast_of.wrap_jane_syntax ["ext"] ~payload ext_ctor
+                Ext_ctor_of.wrap_jane_syntax ["ext"] ~payload ext_ctor
           end
     with
       No_wrap_necessary ext_ctor -> ext_ctor
@@ -866,9 +868,10 @@ module Layouts = struct
   (*********************************************************)
   (* Constructing a [constructor_declaration] with layouts *)
 
+  module Ctor_decl_of = Ast_of (Constructor_declaration) (Ext)
+
   let constructor_declaration_of ~loc ~attrs ~info ~vars_layouts ~args
         ~res name =
-    let module Ast_of = Ast_of (Constructor_declaration) (Ext) in
     let vars, layouts = List.split vars_layouts in
     let ctor_decl =
       Ast_helper.Type.constructor ~loc ~attrs ~info ~vars ~args ?res name
@@ -879,7 +882,7 @@ module Layouts = struct
       let payload = Encode.option_list_as_payload layouts in
       Constructor_declaration.make_entire_jane_syntax ~loc feature
         begin fun () ->
-          Ast_of.wrap_jane_syntax ["vars"] ~payload ctor_decl
+          Ctor_decl_of.wrap_jane_syntax ["vars"] ~payload ctor_decl
         end
 
   let of_constructor_declaration_internal (feat : Feature.t) ctor_decl =
