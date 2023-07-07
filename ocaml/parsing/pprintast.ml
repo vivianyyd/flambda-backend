@@ -440,10 +440,9 @@ and core_type_jane_syntax ctxt attrs f (x : Jane_syntax.Core_type.t) =
   end
   else match x with
   | Jtyp_layout (Ltyp_alias { aliased_type; name; layout }) ->
-    pp f "@[<2>%a@;as@;(%t :@ %a)@]"
+    pp f "@[<2>%a@;as@;(%a :@ %a)@]"
       (core_type1 ctxt) aliased_type
-      (fun ppf ->
-         match name with None -> fprintf ppf "_" | Some s -> tyvar ppf s)
+      tyvar_option name
       layout_annotation layout
   | _ -> pp f "@[<2>%a@]" (core_type1_jane_syntax ctxt attrs) x
 
@@ -451,11 +450,13 @@ and core_type1_jane_syntax ctxt attrs f (x : Jane_syntax.Core_type.t) =
   if has_non_curry_attr attrs then core_type_jane_syntax ctxt attrs f x
   else
     match x with
-    | Jtyp_layout (Ltyp_var { name = None; layout }) ->
-      pp f "(_ :@;%a)" layout_annotation layout
-    | Jtyp_layout (Ltyp_var { name = Some name; layout }) ->
-      pp f "(%a@;:@;%a)" tyvar name layout_annotation layout
+    | Jtyp_layout (Ltyp_var { name; layout }) ->
+      pp f "(%a@;:@;%a)" tyvar_option name layout_annotation layout
     | _ -> paren true (core_type_jane_syntax ctxt attrs) f x
+
+and tyvar_option f = function
+  | None -> pp f "_"
+  | Some name -> tyvar f name
 
 and return_type ctxt f x =
   if x.ptyp_attributes <> [] then maybe_local_type core_type1 ctxt f x
