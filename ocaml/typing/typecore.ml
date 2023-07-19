@@ -5774,18 +5774,30 @@ and type_expect_
           exp_env = env }
       | _ -> raise (Error (loc, env, Probe_is_enabled_format))
     end
+<<<<<<< HEAD
   (* | Pexp_extension ({ txt = "src_pos"; loc:_ }, _) ->
+=======
+  | Pexp_extension ({ txt = "src_pos"; loc }, _) ->
+>>>>>>> 30a63ccb (checkpoint)
       (* CR src_pos: This won't work correctly in Untypeast *)
       (* let path = Predef.path_lexing_position in *)
       (* let lid = Longident.Lident "lexing_position" in
       let constr = newconstr path [] in *)
       rue { exp_desc = Texp_record {
+<<<<<<< HEAD
               fields = failwith "todo";
+=======
+              fields = [| () |];
+>>>>>>> 30a63ccb (checkpoint)
               representation = failwith "todo";
               extended_expression = failwith "todo";
               alloc_mode = failwith "todo"
             };
+<<<<<<< HEAD
             exp_loc = failwith "todo";
+=======
+            exp_loc = loc;
+>>>>>>> 30a63ccb (checkpoint)
             exp_extra = failwith "todo";
             exp_type = failwith "todo";
             exp_env = failwith "todo";
@@ -5806,6 +5818,7 @@ and type_expect_
       
       
       | Texp_record of {
+<<<<<<< HEAD
         fields : ( Types.label_description * record_label_definition ) array;
         representation : Types.record_representation;
         extended_expression : expression option;
@@ -5813,6 +5826,68 @@ and type_expect_
       } *)
 
  *)
+=======
+      fields : ( Types.label_description * record_label_definition ) array;
+      representation : Types.record_representation;
+      extended_expression : expression option;
+      alloc_mode : Types.alloc_mode option
+      }
+          (** { l1=P1; ...; ln=Pn }           (extended_expression = None)
+              { E0 with l1=P1; ...; ln=Pn }   (extended_expression = Some E0)
+
+              Invariant: n > 0
+
+              If the type is { l1: t1; l2: t2 }, the expression
+              { E0 with t2=P2 } is represented as
+              Texp_record
+                { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
+                  extended_expression = Some E0 }
+              [alloc_mode] is the allocation mode of the record,
+              or [None] if it is [Record_unboxed],
+              in which case it does not need allocation.
+            *)
+    | Texp_field of expression * Longident.t loc * Types.label_description * Types.alloc_mode option
+      (** [alloc_mode] is the allocation mode of the result; available ONLY
+          when getting a (float) field from a [Record_float] record
+        *)
+    
+
+  let lbl (field, field_type, layout) = 
+    let id = Ident.create_predef field in 
+      {
+        ld_id=id;
+        ld_mutable=Immutable;
+        ld_global=Unrestricted;
+        ld_type=field_type;
+        ld_layout=layout;
+        ld_loc=Location.none;
+        ld_attributes=[];
+        ld_uid=Uid.of_predef_id id;
+      }
+  in
+  let immediate = Layout.value ~why:(Primitive ident_int) in 
+  let labels = List.map lbl [
+    ("pos_fname", type_string, Layout.value ~why:(Primitive ident_string)); 
+    ("pos_lnum", type_int, immediate); 
+    ("pos_bol", type_int, immediate); 
+    ("pos_cnum", type_int, immediate) ] 
+  in 
+  Type_record (
+    labels, 
+    (Record_boxed (List.map (fun label -> label.ld_layout) labels |> Array.of_list))
+  )
+
+
+
+
+
+
+
+      
+      *)
+
+
+>>>>>>> 30a63ccb (checkpoint)
 
   | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
