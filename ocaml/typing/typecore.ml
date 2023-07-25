@@ -5775,6 +5775,41 @@ and type_expect_
           exp_env = env }
       | _ -> raise (Error (loc, env, Probe_is_enabled_format))
     end
+  | Pexp_extension ({ txt = "src_pos"; loc }, _) ->
+      rue { exp_desc = Texp_record {
+              fields = (Array.map
+                (fun (lbl_desc : label_description) ->
+                  let value, typ =
+                    let pos = loc.loc_start in
+                    (match lbl_desc.lbl_name with
+                    | "pos_fname" -> Texp_constant (Const_string (pos.pos_fname, loc, None)), Predef.type_string
+                    (* TODO vding question: is the above correct for string representation? (no delimiter) *)
+                    | "pos_lnum"  -> Texp_constant (Const_int pos.pos_lnum), Predef.type_int
+                    | "pos_bol"   -> Texp_constant (Const_int pos.pos_bol), Predef.type_int
+                    | "pos_cnum"  -> Texp_constant (Const_int pos.pos_cnum), Predef.type_int
+                    | _ -> assert false)
+                  in
+                  let exp =
+                    { exp_desc = value;
+                      exp_loc = loc;
+                      exp_extra = [];
+                      exp_type = typ;
+                      exp_env = env;
+                      exp_attributes = []
+                    }
+                  in
+                  lbl_desc, Overridden ({txt = (Longident.Lident lbl_desc.lbl_name); loc}, exp))
+                  Predef.lexing_position_labels);
+              representation = Predef.lexing_position_representation;
+              extended_expression = None;
+              alloc_mode = None (* TODO vding question: Is this fine? *)
+            };
+            exp_loc = loc;
+            exp_extra = [];
+            exp_type = Predef.type_lexing_position;
+            exp_env = env;
+            exp_attributes = [];
+          }
   | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
