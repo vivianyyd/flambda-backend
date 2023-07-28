@@ -3027,12 +3027,12 @@ type untyped_apply_arg =
         mode_fun : Alloc_mode.t;
         mode_arg : Alloc_mode.t; }
   | Eliminated_optional_arg of
-      { mode_fun: Alloc_mode.t;
+      { expected_label : arg_label;
+        mode_fun: Alloc_mode.t;
         ty_arg : type_expr;
         sort_arg : sort;
         mode_arg : Alloc_mode.t;
         level: int; }
-  | Eliminated_position_arg
 
 type untyped_omitted_param =
   { mode_fun: Alloc_mode.t;
@@ -3058,7 +3058,7 @@ let remaining_function_type ty_ret mode_ret rev_args =
              let closed_args = mode_arg :: closed_args in
              (ty_ret, mode_ret, closed_args)
          | Arg (Eliminated_optional_arg
-                  { mode_fun; ty_arg; mode_arg; level })
+                  { mode_fun; ty_arg; mode_arg; level; _ })
          | Omitted { mode_fun; ty_arg; mode_arg; level } ->
              let arrow_desc = lbl, mode_arg, mode_ret in
              let ty_ret =
@@ -3230,12 +3230,12 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
             { sarg; ty_arg; ty_arg0; commuted; sort_arg;
               mode_fun; mode_arg; wrapped_in_some })
         in
-        let eliminate_optional_arg () =
+        let eliminate_omittable_arg expected_label =
           may_warn funct.exp_loc
-            (Warnings.Non_principal_labels "eliminated optional argument");
-          Arg
-            (Eliminated_optional_arg
-               { mode_fun; ty_arg; mode_arg; sort_arg; level = lv })
+            (Warnings.Non_principal_labels
+              ("eliminated omittable argument"));
+              Arg (Eliminated_optional_arg
+              { mode_fun; ty_arg; mode_arg; sort_arg; level = lv ; expected_label})
         in
         let remaining_sargs, arg =
           if ignore_labels then begin
@@ -3245,16 +3245,14 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
             | (l', sarg) :: remaining_sargs ->
                 if name = label_name l' || (not omittable && l' = Nolabel) then
                   (remaining_sargs, use_arg ~commuted:false sarg l')
-
-                  (* TODO vding: add clause for position args *)
                 else if
-                  optional &&
+                  omittable &&
                   not (List.exists (fun (l, _) -> name = label_name l)
                          remaining_sargs) &&
                   List.exists (function (Nolabel, _) -> true | _ -> false)
                     sargs
                 then
-                  (sargs, eliminate_optional_arg ())
+                  (sargs, eliminate_omittable_arg l)
                 else
                   raise(Error(sarg.pexp_loc, env,
                               Apply_wrong_label(l', ty_fun', omittable)))
@@ -3267,14 +3265,16 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
                   may_warn sarg.pexp_loc
                     (Warnings.Not_principal "commuting this argument")
                 end;
-                if not omittable && is_optional l' then
+                if not optional && is_optional l' then
                   Location.prerr_warning sarg.pexp_loc
                     (Warnings.Nonoptional_label (Printtyp.string_of_label l));
                 remaining_sargs, use_arg ~commuted sarg l'
             | None ->
                 sargs,
                 if omittable && List.mem_assoc Nolabel sargs then
-                  eliminate_optional_arg ()
+                  eliminate_omittable_arg l
+                  (* TODO vding: Is this case ever hit? [extract_label]
+                     is only None when sargs is empty? *)
                 else begin
                   (* No argument was given for this parameter, we abstract over
                      it. *)
@@ -6574,9 +6574,20 @@ and type_apply_arg env ~app_loc ~funct ~index ~position ~partial_app (lbl, arg) 
         end
       in
       (lbl, Arg (arg, expected_mode.mode, sort_arg))
-  | Arg (Eliminated_optional_arg { ty_arg; sort_arg; _ }) ->
-      let arg = option_none env (instance ty_arg) Location.none in
-      (lbl, Arg (arg, Value_mode.global, sort_arg))
+  | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label; _ }) ->
+      (match expected_label with
+      | Optional _ ->
+          let arg = option_none env (instance ty_arg) Location.none in
+          (lbl, Arg (arg, Value_mode.global, sort_arg))
+      | Position _ ->
+          let arg = {
+            exp_desc = Texp_src_pos;
+            exp_loc = app_loc; exp_extra = [];
+            exp_type = instance Predef.type_lexing_position;
+            exp_attributes = [];
+            exp_env = env } (* TODO vding check value mode *)
+          in (lbl, Arg (arg, Value_mode.global, sort_arg))
+      | Labelled _ | Nolabel -> assert false)
   | Omitted _ as arg -> (lbl, arg)
 
 and type_application env app_loc expected_mode pm
