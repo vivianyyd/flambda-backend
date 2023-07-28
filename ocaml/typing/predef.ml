@@ -147,7 +147,7 @@ and ident_cons = ident_create "::"
 and ident_none = ident_create "None"
 and ident_some = ident_create "Some"
 
-let mk_decl 
+let mk_decl
       ?manifest type_ident
       ?(kind=Type_abstract)
       ?(layout=Layout.value ~why:(Primitive type_ident))
@@ -180,11 +180,11 @@ let immediate_layout = Layout.value ~why:(Primitive ident_int)
 let lexing_position_representation =
   Record_boxed [| Layout.value ~why:(Primitive ident_string); immediate_layout; immediate_layout; immediate_layout |]
 
-let lexing_position_decl = 
-  mk_decl ident_lexing_position 
+let lexing_position_decl =
+  mk_decl ident_lexing_position
     ~kind:(
-      let lbl (field, field_type, layout) = 
-        let id = Ident.create_predef field in 
+      let lbl (field, field_type, layout) =
+        let id = Ident.create_predef field in
         { ld_id=id;
           ld_mutable=Immutable;
           ld_global=Unrestricted;
@@ -194,18 +194,18 @@ let lexing_position_decl =
           ld_attributes=[];
           ld_uid=Uid.of_predef_id id; }
       in
-      let immediate = Layout.value ~why:(Primitive ident_int) in 
+      let immediate = Layout.value ~why:(Primitive ident_int) in
       let labels = List.map lbl [
-        ("pos_fname", type_string, Layout.value ~why:(Primitive ident_string)); 
-        ("pos_lnum", type_int, immediate); 
-        ("pos_bol", type_int, immediate); 
-        ("pos_cnum", type_int, immediate) ] 
-      in 
+        ("pos_fname", type_string, Layout.value ~why:(Primitive ident_string));
+        ("pos_lnum", type_int, immediate);
+        ("pos_bol", type_int, immediate);
+        ("pos_cnum", type_int, immediate) ]
+      in
       Type_record (labels, lexing_position_representation))
     ~layout:(Layout.value ~why:Boxed_record)
     ()
 
-let lexing_position_labels = 
+let lexing_position_labels =
   Datarepr.labels_of_type path_lexing_position lexing_position_decl
   |> Array.of_list |> Array.map (fun (_, label) -> label)
 
