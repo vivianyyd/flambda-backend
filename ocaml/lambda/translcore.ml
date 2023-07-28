@@ -986,7 +986,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
     if Config.stack_allocation then Lexclave l
     else l
   | Texp_src_pos ->
-    let fields = Array.map 
+    let fields = Array.map
       (fun lbl ->
         let pos = e.exp_loc.loc_start in
         let value, typ =
@@ -1011,7 +1011,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             exp_attributes = [] }
         in
         lbl,
-        Overridden 
+        Overridden
           ({txt = (Longident.Lident lbl.lbl_name); loc = e.exp_loc}, field)
       )
       Predef.lexing_position_labels
