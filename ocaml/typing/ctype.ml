@@ -2712,7 +2712,7 @@ let rec mcomp type_pairs env t1 t2 =
             ()
         | (Tarrow ((l1,_,_), t1, u1, _), Tarrow ((l2,_,_), t2, u2, _))
           when l1 = l2 || not (is_omittable l1 || is_omittable l2) ->
-            mcomp type_pairs env t1 t2;
+                    mcomp type_pairs env t1 t2;
             mcomp type_pairs env u1 u2;
         | (Ttuple tl1, Ttuple tl2) ->
             mcomp_list type_pairs env tl1 tl2
