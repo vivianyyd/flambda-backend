@@ -3330,7 +3330,7 @@ let rec is_nonexpansive exp =
   | Texp_unreachable
   | Texp_function _
   | Texp_probe_is_enabled _
-  | Texp_src_pos (* TODO vding: please check *)
+  | Texp_src_pos
   | Texp_array (_, [], _) -> true
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
@@ -5739,12 +5739,12 @@ and type_expect_
       | _ -> raise (Error (loc, env, Probe_is_enabled_format))
     end
   | Pexp_extension ({ txt = "src_pos"; _ }, _) ->
-    rue { (* TODO vding: ruem? re does not work bc it keeps it as poly *)
-      exp_desc = Texp_src_pos;
-      exp_loc = loc; exp_extra = [];
-      exp_type = instance Predef.type_lexing_position;
-      exp_attributes = sexp.pexp_attributes;
-      exp_env = env }
+      rue {
+        exp_desc = Texp_src_pos;
+        exp_loc = loc; exp_extra = [];
+        exp_type = instance Predef.type_lexing_position;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
   | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
