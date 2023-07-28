@@ -3032,6 +3032,7 @@ type untyped_apply_arg =
         sort_arg : sort;
         mode_arg : Alloc_mode.t;
         level: int; }
+  | Eliminated_position_arg
 
 type untyped_omitted_param =
   { mode_fun: Alloc_mode.t;
@@ -3130,7 +3131,7 @@ let check_local_application_complete ~env ~app_loc args =
 let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar =
   let labels_match ~param ~arg =
     param = arg
-    || !Clflags.classic && arg = Nolabel && not (is_optional_or_position param)
+    || !Clflags.classic && arg = Nolabel && not (is_omittable param)
   in
   let has_label l ty_fun =
     let ls, tvar = list_labels env ty_fun in
@@ -3218,7 +3219,8 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
                                      Function_type_not_rep(ty_arg, err)))
         in
         let name = label_name l
-        and optional = is_optional l in
+        and optional = is_optional l
+        and omittable = is_omittable l in
         let use_arg ~commuted sarg l' =
           let wrapped_in_some = optional && not (is_optional l') in
           if wrapped_in_some then
@@ -3241,8 +3243,10 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
             match sargs with
             | [] -> assert false
             | (l', sarg) :: remaining_sargs ->
-                if name = label_name l' || (not optional && l' = Nolabel) then
+                if name = label_name l' || (not omittable && l' = Nolabel) then
                   (remaining_sargs, use_arg ~commuted:false sarg l')
+
+                  (* TODO vding: add clause for position args *)
                 else if
                   optional &&
                   not (List.exists (fun (l, _) -> name = label_name l)
@@ -3253,7 +3257,7 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
                   (sargs, eliminate_optional_arg ())
                 else
                   raise(Error(sarg.pexp_loc, env,
-                              Apply_wrong_label(l', ty_fun', optional)))
+                              Apply_wrong_label(l', ty_fun', omittable)))
           end else
             (* Arguments can be commuted, try to fetch the argument
                corresponding to the first parameter. *)
@@ -3263,13 +3267,13 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
                   may_warn sarg.pexp_loc
                     (Warnings.Not_principal "commuting this argument")
                 end;
-                if not optional && is_optional l' then
+                if not omittable && is_optional l' then
                   Location.prerr_warning sarg.pexp_loc
                     (Warnings.Nonoptional_label (Printtyp.string_of_label l));
                 remaining_sargs, use_arg ~commuted sarg l'
             | None ->
                 sargs,
-                if optional && List.mem_assoc Nolabel sargs then
+                if omittable && List.mem_assoc Nolabel sargs then
                   eliminate_optional_arg ()
                 else begin
                   (* No argument was given for this parameter, we abstract over
@@ -5929,7 +5933,7 @@ and type_function ?in_function loc attrs env (expected_mode : expected_mode)
     let ls, tvar = list_labels env ty in
     List.for_all ((<>) Nolabel) ls && not tvar
   in
-  if is_optional_or_position arg_label && not_nolabel_function ty_ret then
+  if is_omittable arg_label && not_nolabel_function ty_ret then
     Location.prerr_warning (List.hd cases).c_lhs.pat_loc
       Warnings.Unerasable_optional_argument;
   let param = name_cases "param" cases in
@@ -6593,7 +6597,7 @@ and type_application env app_loc expected_mode pm
         begin
           let ls, tvar = list_labels env funct.exp_type in
           not tvar &&
-          let labels = List.filter (fun l -> not (is_optional_or_position l)) ls in
+          let labels = List.filter (fun l -> not (is_omittable l)) ls in
           List.length labels = List.length sargs &&
           List.for_all (fun (l,_) -> l = Nolabel) sargs &&
           List.exists (fun l -> l <> Nolabel) labels &&
