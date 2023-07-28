@@ -18,3 +18,11 @@ let _ = f ~src_pos:x () ;;
 - : lexing_position =
 {pos_fname = ""; pos_lnum = 1; pos_bol = 24; pos_cnum = 32}
 |}]
+
+let _ = "Increment line count"
+let _ = f ~src_pos:[%src_pos] () ;;
+[%%expect{|
+- : string = "Increment line count"
+- : lexing_position =
+{pos_fname = ""; pos_lnum = 2; pos_bol = 437; pos_cnum = 456}
+|}]
