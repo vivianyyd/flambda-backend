@@ -205,10 +205,6 @@ let lexing_position_decl =
     ~layout:(Layout.value ~why:Boxed_record)
     ()
 
-let lexing_position_labels =
-  Datarepr.labels_of_type path_lexing_position lexing_position_decl
-  |> Array.of_list |> Array.map (fun (_, label) -> label)
-
 (* CR layouts: Changes will be needed here as we add support for the built-ins
    to work with non-values, and as we relax the mixed block restriction. *)
 let common_initial_env add_type add_extension empty_env =
