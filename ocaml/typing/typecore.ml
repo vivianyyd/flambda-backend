@@ -3130,7 +3130,7 @@ let check_local_application_complete ~env ~app_loc args =
 let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar =
   let labels_match ~param ~arg =
     param = arg
-    || !Clflags.classic && arg = Nolabel && not (is_optional_or_position param)
+    || !Clflags.classic && arg = Nolabel && not (is_optional param)
   in
   let has_label l ty_fun =
     let ls, tvar = list_labels env ty_fun in
@@ -3709,7 +3709,7 @@ and type_approx_aux env sexp in_function ty_expected =
       in
       let p = if is_position l then inner_pat else p in
       (* TODO vding: This code is still kind of ugly because now, [inner_pat]
-         is sometimes something inside the pattern, sometimes the pattern 
+         is sometimes something inside the pattern, sometimes the pattern
          itself, and sometimes we want to use it, sometimes we don't. Maybe
          it's not that bad? *)
       type_function_approx env sexp.pexp_loc l (Some p) e
@@ -5949,7 +5949,7 @@ and type_function ?in_function loc attrs env (expected_mode : expected_mode)
     let ls, tvar = list_labels env ty in
     List.for_all ((<>) Nolabel) ls && not tvar
   in
-  if is_optional_or_position arg_label && not_nolabel_function ty_ret then
+  if is_optional arg_label && not_nolabel_function ty_ret then
     Location.prerr_warning (List.hd cases).c_lhs.pat_loc
       Warnings.Unerasable_optional_argument;
   let param = name_cases "param" cases in
@@ -6613,7 +6613,7 @@ and type_application env app_loc expected_mode pm
         begin
           let ls, tvar = list_labels env funct.exp_type in
           not tvar &&
-          let labels = List.filter (fun l -> not (is_optional_or_position l)) ls in
+          let labels = List.filter (fun l -> not (is_optional l)) ls in
           List.length labels = List.length sargs &&
           List.for_all (fun (l,_) -> l = Parsetree.Nolabel) sargs &&
           List.exists (fun l -> l <> Nolabel) labels &&
@@ -6628,7 +6628,7 @@ and type_application env app_loc expected_mode pm
       if !Clflags.principal then begin_def () ;
       let sargs = List.map
         (* Application will never contain Position labels, so no need to pass
-           argument type here. When checking against the function type, 
+           argument type here. When checking against the function type,
            Labelled arguments will be matched up to Position parameters
            based on label names *)
         (fun (label, e) -> Typetexp.transl_label label None, e) sargs
@@ -8034,7 +8034,7 @@ let report_error ~loc env = function
         | Nolabel -> fprintf ppf "without label"
         | Position _ as l -> fprintf ppf "with label %s:[%%src_pos]"
                              (prefixed_label_name l)
-        |(Labelled _ | Optional _) as l -> fprintf ppf "with label %s" 
+        |(Labelled _ | Optional _) as l -> fprintf ppf "with label %s"
                                            (prefixed_label_name l)
       in
       let extra_info =

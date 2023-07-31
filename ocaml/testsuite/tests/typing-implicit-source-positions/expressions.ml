@@ -10,7 +10,7 @@ val x : lexing_position =
 
 let f = fun ~(src_pos:[%src_pos]) () -> src_pos
 [%%expect{|
-val f : src_pos:lexing_position -> unit -> lexing_position = <fun>
+val f : src_pos:[%src_pos] -> unit -> lexing_position = <fun>
 |}]
 
 let _ = f ~src_pos:x () ;;
@@ -24,5 +24,5 @@ let _ = f ~src_pos:[%src_pos] () ;;
 [%%expect{|
 - : string = "Increment line count"
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 2; pos_bol = 437; pos_cnum = 456}
+{pos_fname = ""; pos_lnum = 2; pos_bol = 432; pos_cnum = 451}
 |}]
