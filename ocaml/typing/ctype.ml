@@ -2711,7 +2711,7 @@ let rec mcomp type_pairs env t1 t2 =
         | (_, Tvar _)  ->
             ()
         | (Tarrow ((l1,_,_), t1, u1, _), Tarrow ((l2,_,_), t2, u2, _))
-        (* CR vding question: Not sure how to reason about when we want to test 
+        (* CR vding question: Not sure how to reason about when we want to test
            compatibility, is my change correct? *)
           when l1 = l2 || not (is_omittable l1 || is_omittable l2) ->
             mcomp type_pairs env t1 t2;
@@ -3274,8 +3274,8 @@ and unify3 env t1 t1' t2 t2' =
            when
              (l1 = l2 ||
               (!Clflags.classic || in_pattern_mode ()) &&
-              (* CR vding question: Same question here - are we refraining from unifying 
-                 because the arguments may not be passed in, or because they are 
+              (* CR vding question: Same question here - are we refraining from unifying
+                 because the arguments may not be passed in, or because they are
                  specifically Optional? *)
                not (is_optional l1 || is_optional l2)) ->
           unify_alloc_mode_for Unify a1 a2;

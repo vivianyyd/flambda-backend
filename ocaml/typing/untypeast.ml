@@ -677,7 +677,7 @@ let expression sub exp =
         pexp_loc_stack = [];
         pexp_attributes = [];
       }, [Nolabel, sub.expr sub exp])
-    | Texp_src_pos -> Pexp_extension ({ txt = "src_pos"; loc }, PStr []) 
+    | Texp_src_pos -> Pexp_extension ({ txt = "src_pos"; loc }, PStr [])
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs:!attrs desc)
@@ -949,7 +949,7 @@ let core_type sub ct =
         let list = List.map (fun v -> mkloc v loc) list in
         Ptyp_poly (list, sub.typ sub ct)
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
-    | Ttyp_src_pos -> 
+    | Ttyp_src_pos ->
         Ptyp_extension src_pos_extension
   in
   Typ.mk ~loc ~attrs desc

@@ -478,7 +478,7 @@ and transl_type_aux env policy mode styp =
         | (l, arg_mode, arg) :: rest ->
           check_arg_type arg;
           let l = transl_label l (Some arg) in
-          let arg_cty = 
+          let arg_cty =
             if Btype.is_position l then
               (* CR src_pos: Consider bundling argument types into arg_labels, so there
                  is no need to create this redundant type *)
