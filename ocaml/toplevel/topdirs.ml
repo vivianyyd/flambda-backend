@@ -191,6 +191,7 @@ let filter_arrow ty =
   let ty = Ctype.expand_head !toplevel_env ty in
   match get_desc ty with
   | Tarrow ((lbl,_,_), l, r, _) when not (Btype.is_optional lbl) -> Some (l, r)
+  (* TODO vding: seems like we want omittable here. What is topdirs doing though? *)
   | _ -> None
 
 let rec extract_last_arrow desc =

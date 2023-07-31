@@ -3131,7 +3131,8 @@ let check_local_application_complete ~env ~app_loc args =
 let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar =
   let labels_match ~param ~arg =
     param = arg
-    || !Clflags.classic && arg = Nolabel && not (is_optional param)
+    || !Clflags.classic && arg = Nolabel && not (is_omittable param)
+    (* TODO vding: I think this change to is_omittable is correct? *)
   in
   let has_label l ty_fun =
     let ls, tvar = list_labels env ty_fun in
@@ -3265,7 +3266,8 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
                   may_warn sarg.pexp_loc
                     (Warnings.Not_principal "commuting this argument")
                 end;
-                if not optional && is_optional l' then (* TODO vding: should test and change to ommitable *)
+                (* TODO vding: wrote about this in my notes doc, reminder to check *)
+                if not optional && is_optional l' then
                   Location.prerr_warning sarg.pexp_loc
                     (Warnings.Nonoptional_label (Printtyp.string_of_label l));
                 remaining_sargs, use_arg ~commuted sarg l'
@@ -3596,6 +3598,8 @@ let rec approx_type env sty =
       (* CR layouts v5: value requirement here to be relaxed *)
       let p = Typetexp.transl_label p (Some arg_sty) in
       if is_optional p then newvar (Layout.value ~why:Type_argument)
+        (* TODO vding question: Why make a new variable in the optional case,
+           and we should do this for omittable args in general? *)
       else begin
         let arg_mode = Typetexp.get_alloc_mode arg_sty in
         let arg_ty =
@@ -3670,6 +3674,7 @@ let rec type_function_approx env loc label spato sexp in_function ty_expected =
         let has_local = has_local_attr_pat spat in
         let has_poly = has_poly_constraint spat in
         if has_poly && is_optional label then
+          (* TODO vding: omittable? *)
           raise(Error(spat.ppat_loc, env, Optional_poly_param));
         has_local, has_poly
   in
@@ -4423,6 +4428,7 @@ and type_expect_
       let has_local = has_local_attr_pat spat in
       let has_poly = has_poly_constraint spat in
       if has_poly && is_optional_parsetree l then
+        (* TODO vding: omittable? *)
         raise(Error(spat.ppat_loc, env, Optional_poly_param));
       if has_poly
          && not (Language_extension.is_enabled Polymorphic_parameters) then
@@ -6628,7 +6634,11 @@ and type_application env app_loc expected_mode pm
         begin
           let ls, tvar = list_labels env funct.exp_type in
           not tvar &&
-          let labels = List.filter (fun l -> not (is_optional l)) ls in
+          (* TODO vding: When the below is is_optional, the warning is printed
+             for Position arguments applied without a label too. But
+             an Error is presented at collect_apply_unknown_args, these are
+             redundant. Pick one. *)
+          let labels = List.filter (fun l -> not (is_omittable l)) ls in
           List.length labels = List.length sargs &&
           List.for_all (fun (l,_) -> l = Parsetree.Nolabel) sargs &&
           List.exists (fun l -> l <> Nolabel) labels &&

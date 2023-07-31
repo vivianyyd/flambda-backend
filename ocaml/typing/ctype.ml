@@ -3272,7 +3272,9 @@ and unify3 env t1 t1' t2 t2' =
            when
              (l1 = l2 ||
               (!Clflags.classic || in_pattern_mode ()) &&
-               not (is_optional l1 || is_optional l2)) ->
+               not (is_omittable l1 || is_omittable l2)) ->
+              (* TODO vding question: Not sure if this is correct. We want to
+                 unify in the case that neither are omittable? *)
           unify_alloc_mode_for Unify a1 a2;
           unify_alloc_mode_for Unify r1 r2;
           unify  env t1 t2; unify env  u1 u2;
@@ -3800,6 +3802,7 @@ let filter_arrow env t l ~force_tpoly =
     let l_res = Layout.of_sort ~why:Function_result ret_sort in
     let ty_arg =
       if not force_tpoly then begin
+        (* TODO vding: omittable? *)
         assert (not (is_optional l));
         newvar2 level l_arg
       end else begin
@@ -3844,7 +3847,9 @@ let filter_arrow env t l ~force_tpoly =
       constrain_type_layout_exn env Unify t' layout;
       arrow_desc
   | Tarrow((l', arg_mode, ret_mode), ty_arg, ty_ret, _) ->
-      if l = l' || !Clflags.classic && l = Nolabel && not (is_optional l')
+      if l = l' || !Clflags.classic && l = Nolabel && not (is_omittable l')
+        (* TODO vding: I think we want to proceed as long as the
+           argument is not omittable*)
       then
         (* CR layouts v2.5: When we move the restrictions on argument from
            arrows to functions, this function doesn't need to return a sort and
@@ -4368,6 +4373,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
              Tarrow ((l2,a2,r2), t2, u2, _)) when
                (l1 = l2
                 || !Clflags.classic && not (is_optional l1 || is_optional l2)) ->
+                  (* TODO vding: omittable? *)
               moregen inst_nongen (neg_variance variance) type_pairs env t1 t2;
               moregen inst_nongen variance type_pairs env u1 u2;
               moregen_alloc_mode (neg_variance variance) a1 a2;
@@ -4739,6 +4745,7 @@ let rec eqtype rename type_pairs subst env t1 t2 =
              Tarrow ((l2,a2,r2), t2, u2, _)) when
                (l1 = l2
                 || !Clflags.classic && not (is_optional l1 || is_optional l2)) ->
+                  (* TODO vding: omittable? *)
               eqtype rename type_pairs subst env t1 t2;
               eqtype rename type_pairs subst env u1 u2;
               eqtype_alloc_mode a1 a2;
@@ -5496,6 +5503,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
     | (Tarrow((l1,a1,r1), t1, u1, _),
        Tarrow((l2,a2,r2), t2, u2, _)) when l1 = l2
       || !Clflags.classic && not (is_optional l1 || is_optional l2) ->
+        (* TODO vding: omittable? *)
         let cstrs =
           subtype_rec
             env

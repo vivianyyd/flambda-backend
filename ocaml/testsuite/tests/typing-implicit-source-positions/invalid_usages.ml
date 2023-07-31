@@ -93,10 +93,6 @@ val n : src_pos:[%src_pos] -> unit -> lexing_position = <fun>
 
 let _ = n Lexing.dummy_pos ();;
 [%%expect {|
-Line 1, characters 8-9:
-1 | let _ = n Lexing.dummy_pos ();;
-            ^
-Warning 6 [labels-omitted]: label src_pos was omitted in the application of this function.
 Line 1, characters 27-29:
 1 | let _ = n Lexing.dummy_pos ();;
                                ^^
