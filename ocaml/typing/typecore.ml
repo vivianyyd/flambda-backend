@@ -3265,7 +3265,7 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
                   may_warn sarg.pexp_loc
                     (Warnings.Not_principal "commuting this argument")
                 end;
-                if not optional && is_optional l' then
+                if not optional && is_optional l' then (* TODO vding: should test and change to ommitable *)
                   Location.prerr_warning sarg.pexp_loc
                     (Warnings.Nonoptional_label (Printtyp.string_of_label l));
                 remaining_sargs, use_arg ~commuted sarg l'
@@ -5953,9 +5953,9 @@ and type_function ?in_function loc attrs env (expected_mode : expected_mode)
     let ls, tvar = list_labels env ty in
     List.for_all ((<>) Nolabel) ls && not tvar
   in
-  if is_optional arg_label && not_nolabel_function ty_ret then
+  if is_omittable arg_label && not_nolabel_function ty_ret then
     Location.prerr_warning (List.hd cases).c_lhs.pat_loc
-      Warnings.Unerasable_optional_argument;
+      Warnings.Unerasable_omittable_argument;
   let param = name_cases "param" cases in
   let region = region_locked && not uncurried_function in
   let warnings = Warnings.backup () in
